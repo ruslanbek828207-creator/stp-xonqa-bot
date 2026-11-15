@@ -76,7 +76,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu tugmalari
+# Asosiy menyu tugmalari (MSMS qo'shilgan holda)
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -94,6 +94,9 @@ keyboard = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
             KeyboardButton(text="🗺 Geowfm Xarita", web_app=WebAppInfo(url="https://geofm.uztelecom.uz/geoutr/equipments/list"))
+        ],
+        [
+            KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/"))
         ]
     ],
     resize_keyboard=True
