@@ -104,15 +104,4 @@ async def command_start_handler(message: Message) -> None:
 @dp.message(F.text == "🌐 Internet tariflari")
 async def internet_handler(message: Message) -> None:
     await message.answer(
-        "<b>UZTELECOM Home Internet tariflari (Xonqa):</b>\n\n"
-        "• 100 Mb/s - Yuqori tezlikdagi optik internet\n"
-        "• 200 Mb/s - Qulay paket\n"
-        "• 1 Gbit/s - Super tezlik!\n\n"
-        "Ulanish uchun operator bilan bog'laning: +998995603937"
-    )
-
-@dp.message(F.text == "⚡ Splitterlar va abonentlar")
-async def splitters_menu(message: Message) -> None:
-    inline_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [Inline
+        "<b>UZTELECOM Home Internet
