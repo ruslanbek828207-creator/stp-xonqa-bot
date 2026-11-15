@@ -52,7 +52,6 @@ try:
 except Exception as e:
     print(f"❌ Excel faylni o'qishda xatolik: {e}")
 
-# Qishloq va shaharchalar ro'yxati
 TOWNS_LIST = sorted(list(set(s['town'] for s in splitters_list if s['town'] and s['town'] != 'nan')))
 
 UCHASKA_10_DATA = {
@@ -154,12 +153,13 @@ async def text_handler(message: Message) -> None:
                 town = s['town'].lower()
                 sn = s['real_sn'].lower()
                 
-                match_all = True
+                # Mos kelishni tekshirish (kalit so'zlardan biri topilsa ham qabul qiladi)
+                match_any = True
                 for kw in keywords:
                     if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
-                        match_all = False
+                        match_any = False
                         break
-                if match_all:
+                if match_any:
                     found.append(s)
 
             if not found:
@@ -176,7 +176,7 @@ async def text_handler(message: Message) -> None:
                         f"-----------------------------------\n"
                     )
                 if len(found) > 10:
-                    response += "\n<i>Natijalar ko'p, faqat dastlabki 10 tasi ko'rsatildi. Aniqroq kiriting.</i>"
+                    response += f"\n<i>Natijalar ko'p ({len(found)} ta), faqat dastlabki 10 tasi ko'rsatildi. Aniqroq kiriting.</i>"
                 await message.answer(response, parse_mode=ParseMode.HTML)
             return
 
@@ -192,11 +192,18 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Splitter qidirish":
             search_state.add(user_id)
-            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini va raqamni kiriting (masalan: <code>Олажа</code> yoki <code>Мадир, 1/1/2</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini va raqamni kiriting (masalan: <code>Тома</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
+            row = []
             for t in TOWNS_LIST:
-                buttons.append([InlineKeyboardButton(text=f"🏘 {t}", callback_data=f"town_{t}")])
+                short_name = t.replace(" қишлоғи", "").replace(" шаҳарчаси", "")
+                row.append(InlineKeyboardButton(text=f"🏘 {short_name}", callback_data=f"town_{t}"))
+                if len(row) == 2:
+                    buttons.append(row)
+                    row = []
+            if row:
+                buttons.append(row)
             await message.answer("<b>Xonqa tumanidagi qishloq va shaharchalar:</b>\nKerakli hududni tanlang:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         elif text == "🏢 10-uchaska obyektlari":
             buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
