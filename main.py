@@ -20,7 +20,7 @@ from aiogram.types import (
 TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
 dp = Dispatcher()
 
-# 10-uchaska manzillari bazasi (10-uchaska.xlsx faylidan)
+# 10-uchaska manzillari bazasi
 UCHASKA_10_DATA = {
     "uch_1": {"name": "Ёрқин Юлдуз-2 берк кўчаси", "status": "Uzluksiz xizmat ko'rsatishda", "signal": "Normal (-19 dBm)"},
     "uch_2": {"name": "Олажа қишлоғи, Yorqin yulduz уй", "status": "Faol", "signal": "Yaxshi (-20 dBm)"},
@@ -52,7 +52,7 @@ SPLITTERS_DATA = {
     }
 }
 
-# Elektramontyorlar bazasi (Sotrudniki faylidan aniq ro'yxat va telefonlar)
+# Elektramontyorlar bazasi
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Xonqa tumani, Markaziy MFY", "task": "Optik tarmoqlarni tortish, svarka qilish va abonentlarni ulash."},
     "elect_2": {"name": "Отабоев Рамзиддин Рахматилло угли", "phone": "+998995603938", "zone": "Xonqa tumani, Paxtakor MFY", "task": "Beton stalbalarda ishlash, drop kabel tortish va routerlarni sozlash."},
@@ -210,24 +210,30 @@ async def contact_handler(message: Message) -> None:
 async def echo_handler(message: Message) -> None:
     await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
 
+# Render uchun oddiy veb-server (portni ushlab turish uchun)
 async def handle_ping(request):
     return web.Response(text="Bot ishlayapti!")
 
-async def start_web_server():
+async def web_server_runner():
     app = web.Application()
     app.router.add_get("/", handle_ping)
     runner = web.AppRunner(app)
     await runner.setup()
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
 async def main() -> None:
-    await start_web_server()
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    
+    # Veb-serverni ishga tushiramiz
+    await web_server_runner()
+    
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await bot.delete_webhook(drop_pending_updates=True)
+    
+    # Botni polling rejimida ishga tushiramiz
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     asyncio.run(main())
