@@ -17,7 +17,7 @@ from aiogram.types import (
     WebAppInfo
 )
 
-TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
+TOKEN = "9125362206:AAHyIEixDL2aLXnjwcJ2qSfjcVpGwQ4IwB4"
 dp = Dispatcher()
 
 # Admin Telegram ID raqami
@@ -110,7 +110,6 @@ keyboard = ReplyKeyboardMarkup(
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    # Admin tekshiruvi: faqat ADMIN_ID ga ruxsat beriladi
     if message.from_user.id != ADMIN_ID:
         await message.answer("❌ Kechirasiz, bu bot faqat mas'ul xodimlar uchun yopiq rejimda ishlaydi.")
         return
