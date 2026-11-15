@@ -17,7 +17,7 @@ from aiogram.types import (
     WebAppInfo
 )
 
-TOKEN = "9125362206:AAFzP3W9w9cfHSqa0ymoZpW0mpKP6eISpj8"
+TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
 dp = Dispatcher()
 
 # Splitterlar bazasi
