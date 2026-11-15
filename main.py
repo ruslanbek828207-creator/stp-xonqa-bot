@@ -20,7 +20,7 @@ from aiogram.types import (
 TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
 dp = Dispatcher()
 
-# Foydalanuvchilar ro'yxatini xotirada saqlash uchun to'plam (Set)
+# Foydalanuvchilar ro'yxatini saqlash
 active_users = set()
 
 # 10-uchaska manzillari bazasi
@@ -118,7 +118,6 @@ async def command_start_handler(message: Message) -> None:
         reply_markup=keyboard
     )
 
-# Kimlar ulanganni ko'rish uchun maxfiy buyruq: /stats
 @dp.message(Command("stats"))
 async def stats_handler(message: Message) -> None:
     if not active_users:
@@ -167,3 +166,112 @@ async def splitters_menu(message: Message) -> None:
             [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")]
         ]
     )
+    await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("split_"))
+async def process_splitter_callback(callback: CallbackQuery) -> None:
+    splitter_id = callback.data
+    data = SPLITTERS_DATA.get(splitter_id)
+    if data:
+        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}"
+    else:
+        text = "Ma'lumot topilmadi."
+    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "🏢 10-uchaska obyektlari")
+async def uchaska_menu(message: Message) -> None:
+    buttons = []
+    for key, val in UCHASKA_10_DATA.items():
+        buttons.append([InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)])
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer("<b>10-uchaska hududlari va manzillari:</b>\nKerakli manzilni tanlang:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("uch_"))
+async def process_uchaska_callback(callback: CallbackQuery) -> None:
+    uch_id = callback.data
+    data = UCHASKA_10_DATA.get(uch_id)
+    if data:
+        text = (
+            f"🏢 <b>Obyekt / Manzil:</b> {data['name']}\n"
+            f"📌 <b>Holati:</b> {data['status']}\n"
+            f"⚡ <b>Signal darajasi:</b> {data['signal']}"
+        )
+    else:
+        text = "Ma'lumot topilmadi."
+    await callback.message.answer(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "👷 Elektramontyorlar")
+async def electricians_handler(message: Message) -> None:
+    buttons = []
+    for key, val in ELECTRICIANS_DATA.items():
+        buttons.append([InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)])
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer("Xonqa tumanidagi elektramontyorlar ro'yxati. Xodim haqida ma'lumot olish uchun uning ustiga bosing:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("elect_"))
+async def process_electrician_callback(callback: CallbackQuery) -> None:
+    elect_id = callback.data
+    data = ELECTRICIANS_DATA.get(elect_id)
+    if data:
+        text = (
+            f"👷 <b>Elektramontyor:</b> {data['name']}\n"
+            f"📞 <b>Telefon raqami:</b> {data['phone']}\n"
+            f"📍 <b>Xizmat ko'rsatish zonasi:</b> {data['zone']}\n"
+            f"🛠 <b>Vazifasi / Qiladigan ishi:</b> {data['task']}"
+        )
+    else:
+        text = "Ma'lumot topilmadi."
+    await callback.message.answer(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "🛠 Xizmatlar va murojaat")
+async def services_handler(message: Message) -> None:
+    await message.answer(
+        "<b>Texnik xizmatlar va o'rnatish:</b>\n"
+        "• Optik fiber svarka\n"
+        "• Beton stalbalarda ishlash va drop kabel tortish\n"
+        "• 1x2 va 1x16 splitterlarda signalni tekshirish\n"
+        "• ZTE ZXHN F6600P va TP-Link routerlarini sozlash\n\n"
+        "Murojaat uchun tel: +998995603937"
+    )
+
+@dp.message(F.text == "📞 Bog'lanish")
+async def contact_handler(message: Message) -> None:
+    await message.answer(
+        "📞 <b>Aloqa ma'lumotlari:</b>\n"
+        "• Mas'ul: Elektramontyor\n"
+        "• Telefon: +998995603937\n"
+        "• Hudud: Xonqa tumani, Xorazm"
+    )
+
+@dp.message()
+async def echo_handler(message: Message) -> None:
+    await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
+
+# Render uchun veb-server (portni band qilib turish uchun)
+async def handle_ping(request):
+    return web.Response(text="Bot ishlayapti!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+async def main() -> None:
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    
+    # Veb-server va botni bir vaqtda (fon rejimida) ishga tushiramiz
+    await start_web_server()
+    
+    bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
