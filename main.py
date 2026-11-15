@@ -20,7 +20,7 @@ from aiogram.types import (
 TOKEN = "9125362206:AAFzP3W9w9cfHSqa0ymoZpW0mpKP6eISpj8"
 dp = Dispatcher()
 
-# Abonentlar bazasi (Splitterlar bo'yicha matn shaklida)
+# Splitterlar bazasi
 SPLITTERS_DATA = {
     "split_1x2_1": {
         "name": "Splitter 1x2 №1 (Markaz)",
@@ -46,6 +46,31 @@ SPLITTERS_DATA = {
     }
 }
 
+# Elektramontyorlar ro'yxati (Excel fayldan)
+ELECTRICIANS_TEXT = (
+    "👷 <b>Xonqa tumanidagi UZTELECOM elektramontyorlari:</b>\n\n"
+    "1. Шоназаров Достон Хайитбоевич\n    📞 +998995054885\n"
+    "2. Отабоев Рамзиддин Рахматилло угли\n    📞 +998995603938\n"
+    "3. Юсупов Бобур Сапарбой ўғли\n    📞 +998995601312\n"
+    "4. Каримов Илхом Машарипович\n    📞 +998995606399\n"
+    "5. Абдурахмонов Хушнуд Ниёзметович\n    📞 +998995603001\n"
+    "6. Жуманиёзов Жўшқин Шоназарович\n    📞 +998995608636\n"
+    "7. Атажанов Рустам Комоладдинович\n    📞 +998992797072\n"
+    "8. Каримов Заир Авезметович\n    📞 +998995601310\n"
+    "9. Бабажанов Искандар Сапарбекович\n    📞 +998995603005\n"
+    "10. Каримов Дониёр Хаджибоевич\n    📞 +998995603171\n"
+    "11. Жуманиёзов Руслан Рустамович\n    📞 +998995603937\n"
+    "12. Саидов Хушнуд Матяқубович\n    📞 +998992797071\n"
+    "13. Жаббаров Хамдам Рустамович\n    📞 +998995603936\n"
+    "14. Хаитов Хаитбай Шоназарович\n    📞 +998995603934\n"
+    "15. Саидов Умарбек Шавкатович\n    📞 +998995603002\n"
+    "16. Эгамов Азизбек Озод угли\n    📞 +998977929525\n"
+    "17. Якубов Жасурбек Ахмеджонович\n    📞 +998995606787\n"
+    "18. Машарипов Али Валиевич\n    📞 +998995603931\n"
+    "19. Ваисов Рустам Юсуфбоевич\n    📞 +998995603935\n"
+    "20. Юлдошов Кадамбой Атабоевич\n    📞 +998995603007"
+)
+
 # Asosiy menyu tugmalari
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
@@ -54,11 +79,14 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="⚡ Splitterlar va abonentlar")
         ],
         [
+            KeyboardButton(text="👷 Elektramontyorlar"),
+            KeyboardButton(text="🛠 Xizmatlar va murojaat")
+        ],
+        [
             KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
             KeyboardButton(text="🗺 Geowfm Xarita", web_app=WebAppInfo(url="https://geofm.uztelecom.uz/geoutr/equipments/list"))
         ],
         [
-            KeyboardButton(text="🛠 Xizmatlar va murojaat"),
             KeyboardButton(text="📞 Bog'lanish")
         ]
     ],
@@ -86,7 +114,6 @@ async def internet_handler(message: Message) -> None:
 
 @dp.message(F.text == "⚡ Splitterlar va abonentlar")
 async def splitters_menu(message: Message) -> None:
-    # Splitterlarni tanlash uchun inline tugmalar
     inline_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
@@ -108,6 +135,10 @@ async def process_splitter_callback(callback: CallbackQuery) -> None:
         
     await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
     await callback.answer()
+
+@dp.message(F.text == "👷 Elektramontyorlar")
+async def electricians_handler(message: Message) -> None:
+    await message.answer(ELECTRICIANS_TEXT)
 
 @dp.message(F.text == "🛠 Xizmatlar va murojaat")
 async def services_handler(message: Message) -> None:
