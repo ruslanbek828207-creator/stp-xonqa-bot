@@ -20,6 +20,9 @@ from aiogram.types import (
 TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
 dp = Dispatcher()
 
+# Admin Telegram ID raqami
+ADMIN_ID = 51975910
+
 # Foydalanuvchilar ro'yxatini saqlash
 active_users = set()
 
@@ -107,6 +110,11 @@ keyboard = ReplyKeyboardMarkup(
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
+    # Admin tekshiruvi: faqat ADMIN_ID ga ruxsat beriladi
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Kechirasiz, bu bot faqat mas'ul xodimlar uchun yopiq rejimda ishlaydi.")
+        return
+
     user = message.from_user
     user_info = f"👤 {user.full_name} (ID: <code>{user.id}</code>)"
     active_users.add(user_info)
@@ -120,6 +128,9 @@ async def command_start_handler(message: Message) -> None:
 
 @dp.message(Command("stats"))
 async def stats_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
+        
     if not active_users:
         await message.answer("Hozircha botga ulangan foydalanuvchilar yo'q.")
         return
@@ -132,6 +143,8 @@ async def stats_handler(message: Message) -> None:
 
 @dp.message(F.text == "🌐 Internet tariflari")
 async def internet_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     text = (
         "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
         "🔥 <b>Hammasi birga 4</b>\n"
@@ -160,6 +173,8 @@ async def internet_handler(message: Message) -> None:
 
 @dp.message(F.text == "⚡ Splitterlar va abonentlar")
 async def splitters_menu(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     inline_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
@@ -170,6 +185,9 @@ async def splitters_menu(message: Message) -> None:
 
 @dp.callback_query(F.data.startswith("split_"))
 async def process_splitter_callback(callback: CallbackQuery) -> None:
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
     splitter_id = callback.data
     data = SPLITTERS_DATA.get(splitter_id)
     if data:
@@ -181,6 +199,8 @@ async def process_splitter_callback(callback: CallbackQuery) -> None:
 
 @dp.message(F.text == "🏢 10-uchaska obyektlari")
 async def uchaska_menu(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     buttons = []
     for key, val in UCHASKA_10_DATA.items():
         buttons.append([InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)])
@@ -189,6 +209,9 @@ async def uchaska_menu(message: Message) -> None:
 
 @dp.callback_query(F.data.startswith("uch_"))
 async def process_uchaska_callback(callback: CallbackQuery) -> None:
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
     uch_id = callback.data
     data = UCHASKA_10_DATA.get(uch_id)
     if data:
@@ -204,6 +227,8 @@ async def process_uchaska_callback(callback: CallbackQuery) -> None:
 
 @dp.message(F.text == "👷 Elektramontyorlar")
 async def electricians_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     buttons = []
     for key, val in ELECTRICIANS_DATA.items():
         buttons.append([InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)])
@@ -212,6 +237,9 @@ async def electricians_handler(message: Message) -> None:
 
 @dp.callback_query(F.data.startswith("elect_"))
 async def process_electrician_callback(callback: CallbackQuery) -> None:
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
+        return
     elect_id = callback.data
     data = ELECTRICIANS_DATA.get(elect_id)
     if data:
@@ -228,6 +256,8 @@ async def process_electrician_callback(callback: CallbackQuery) -> None:
 
 @dp.message(F.text == "🛠 Xizmatlar va murojaat")
 async def services_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     await message.answer(
         "<b>Texnik xizmatlar va o'rnatish:</b>\n"
         "• Optik fiber svarka\n"
@@ -239,6 +269,8 @@ async def services_handler(message: Message) -> None:
 
 @dp.message(F.text == "📞 Bog'lanish")
 async def contact_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     await message.answer(
         "📞 <b>Aloqa ma'lumotlari:</b>\n"
         "• Mas'ul: Elektramontyor\n"
@@ -248,9 +280,11 @@ async def contact_handler(message: Message) -> None:
 
 @dp.message()
 async def echo_handler(message: Message) -> None:
+    if message.from_user.id != ADMIN_ID:
+        return
     await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
 
-# Render uchun veb-server (portni band qilib turish uchun)
+# Render uchun veb-server
 async def handle_ping(request):
     return web.Response(text="Bot ishlayapti!")
 
@@ -265,10 +299,7 @@ async def start_web_server():
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    
-    # Veb-server va botni bir vaqtda (fon rejimida) ishga tushiramiz
     await start_web_server()
-    
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
