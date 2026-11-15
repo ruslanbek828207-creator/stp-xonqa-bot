@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import sys
+import pandas as pd
 from aiohttp import web
 from aiogram import Bot, Dispatcher, html, F
 from aiogram.client.default import DefaultBotProperties
@@ -27,6 +28,27 @@ SECRET_PASSWORD = "3939"
 # Tasdiqlangan (parolni kiritgan) foydalanuvchilar bazasi
 authorized_users = set()
 
+# Excel fayldan Xonqa (Ханкинский УТ) splitterlarini yuklab olish
+EXCEL_FILE = "ХОРЕЗМСКИЙ ФИЛИАЛ Splitter 01.02.2024 5 (1).xlsx"
+splitters_list = []
+
+try:
+    if os.path.exists(EXCEL_FILE):
+        xls = pd.ExcelFile(EXCEL_FILE)
+        for sheet in xls.sheet_names:
+            temp_df = pd.read_excel(EXCEL_FILE, sheet_name=sheet)
+            xonqa_df = temp_df[temp_df['uzel'].astype(str).str.contains('Ханкинский', case=False, na=False)]
+            for _, row in xonqa_df.iterrows():
+                splitters_list.append({
+                    "splitter": str(row.get('splitter', '')),
+                    "model": str(row.get('model', '')),
+                    "fict_sn": str(row.get('fict s/n', '')),
+                    "real_sn": str(row.get('real s/n', ''))
+                })
+        print(f"✅ Exceldan {len(splitters_list)} ta Xonqa splitterlari yuklandi.")
+except Exception as e:
+    print(f"❌ Excel faylni o'qishda xatolik: {e}")
+
 # 10-uchaska manzillari bazasi
 UCHASKA_10_DATA = {
     "uch_1": {"name": "Ёрқин Юлдуз-2 берк кўчаси", "status": "Uzluksiz xizmat ko'rsatishda", "signal": "Normal (-19 dBm)"},
@@ -38,25 +60,6 @@ UCHASKA_10_DATA = {
     "uch_7": {"name": "Олажа қишлоғи, Бўстонлиқ кўчаси", "status": "Faol", "signal": "Normal (-23 dBm)"},
     "uch_8": {"name": "Олажа қишлоғи, Бухоро кўчаси", "status": "Faol", "signal": "Yaxshi (-20 dBm)"},
     "uch_9": {"name": "Олажа қишлоғи, Буюк ипак йўли 3- йўлак кўчаси", "status": "Faol", "signal": "Normal (-22 dBm)"},
-}
-
-# Splitterlar bazasi
-SPLITTERS_DATA = {
-    "split_1x2_1": {
-        "name": "Splitter 1x2 №1 (Markaz)",
-        "info": "Signal darajasi: Normal (-18 dBm)\n\n"
-                "<b>Ulangan abonentlar:</b>\n"
-                "1. Ismoilov Anvar - 15-uy (Tel: +998901234567)\n"
-                "2. Matyakubov Baxtiyor - 18-uy (Tel: +998919876543)"
-    },
-    "split_1x16_1": {
-        "name": "Splitter 1x16 №1 (Xonqa ko'cha)",
-        "info": "Signal darajasi: Yaxshi (-21 dBm)\n\n"
-                "<b>Ulangan abonentlar:</b>\n"
-                "1. Jumaniyozov Jasur - 4-uy (Tel: +998931112233)\n"
-                "2. Raximov Farhod - 12-uy (Tel: +998974445566)\n"
-                "3. Bobojonov Rustam - 25-uy (Tel: +998997778899)"
-    }
 }
 
 # Elektramontyorlar bazasi
@@ -83,12 +86,12 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu tugmalari (GeoWFM xarita va qidiruv havolasi qo'shildi)
+# Asosiy menyu tugmalari
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="🌐 Internet tariflari"),
-            KeyboardButton(text="⚡ Splitterlar va abonentlar")
+            KeyboardButton(text="⚡ Splitter qidirish")
         ],
         [
             KeyboardButton(text="🏢 10-uchaska obyektlari"),
@@ -109,6 +112,9 @@ keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+# Foydalanuvchilar qidiruv holatini saqlash uchun
+search_state = set()
+
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     if message.from_user.id == ADMIN_ID or message.from_user.id in authorized_users:
@@ -125,10 +131,7 @@ async def command_start_handler(message: Message) -> None:
 async def stats_handler(message: Message) -> None:
     if message.from_user.id != ADMIN_ID:
         return
-    if not authorized_users:
-        await message.answer("Hozircha parolni kiritib ulangan xodimlar yo'q.")
-        return
-    await message.answer(f"📊 Parolni kiritib ulangan xodimlar soni: {len(authorized_users)} ta")
+    await message.answer(f"📊 Parolni kiritib ulangan xodimlar: {len(authorized_users)} ta\n📦 Bazadagi Xonqa splitterlari: {len(splitters_list)} ta")
 
 @dp.message()
 async def text_handler(message: Message) -> None:
@@ -136,24 +139,42 @@ async def text_handler(message: Message) -> None:
     text = message.text.strip()
 
     if user_id == ADMIN_ID or user_id in authorized_users:
+        if user_id in search_state:
+            # Splitter qidirish jarayoni
+            search_state.remove(user_id)
+            query = text.lower()
+            found = [s for s in splitters_list if query in s['splitter'].lower() or query in s['real_sn'].lower() or query in s['fict_sn'].lower()]
+            
+            if not found:
+                await message.answer("❌ Bunday splitter topilmadi. Qaytadan urinib ko'rish uchun '⚡ Splitter qidirish' tugmasini bosing.")
+            else:
+                response = f"🔍 <b>Qidiruv natijalari ({len(found)} ta):</b>\n\n"
+                for item in found[:10]: # Ko'pi bilan 10 tasini ko'rsatish
+                    response += (
+                        f"📍 <b>Splitter:</b> {item['splitter']}\n"
+                        f"⚙️ <b>Model:</b> {item['model']}\n"
+                        f"📋 <b>Fict S/N:</b> {item['fict_sn']}\n"
+                        f"🔢 <b>Real S/N:</b> {item['real_sn']}\n"
+                        f"-----------------------------------\n"
+                    )
+                if len(found) > 10:
+                    response += "\n<i>Natijalar ko'p, faqat dastlabki 10 tasi ko'rsatildi. Aniqroq yozing.</i>"
+                await message.answer(response, parse_mode=ParseMode.HTML)
+            return
+
         if text == "🌐 Internet tariflari":
             await message.answer(
                 "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
-                "🔥 <b>Hammasi birga 4</b>\n• Internet tezligi: 500 Mbit/s\n• Narxi: 500 000 so'm/oyiga\n\n"
-                "🔥 <b>Hammasi birga 3+</b>\n• Internet tezligi: 350 Mbit/s\n• Narxi: 350 000 so'm/oyiga\n\n"
-                "🔥 <b>Hammasi birga 3</b>\n• Internet tezligi: 250 Mbit/s\n• Narxi: 215 000 so'm/oyiga\n\n"
-                "🔥 <b>Hammasi birga 2+</b>\n• Internet tezligi: 150 Mbit/s\n• Narxi: 175 000 so'm/oyiga\n\n"
-                "📞 Ulanish uchun mas'ul: +998995603937",
+                "🔥 <b>Hammasi birga 4</b> (500 Mbit/s) - 500 000 so'm/oy\n"
+                "🔥 <b>Hammasi birga 3+</b> (350 Mbit/s) - 350 000 so'm/oy\n"
+                "🔥 <b>Hammasi birga 3</b> (250 Mbit/s) - 215 000 so'm/oy\n"
+                "🔥 <b>Hammasi birga 2+</b> (150 Mbit/s) - 175 000 so'm/oy\n\n"
+                "📞 Mas'ul: +998995603937",
                 parse_mode=ParseMode.HTML
             )
-        elif text == "⚡ Splitterlar va abonentlar":
-            inline_kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
-                    [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")]
-                ]
-            )
-            await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
+        elif text == "⚡ Splitter qidirish":
+            search_state.add(user_id)
+            await message.answer("🔍 Qidirmoqchi bo'lgan splitter raqamini yoki nomini kiriting (masalan: <code>1/1/2</code> yoki <code>3/6/3</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏢 10-uchaska obyektlari":
             buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
             await message.answer("<b>10-uchaska hududlari va manzillari:</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -181,11 +202,7 @@ async def callback_handler(callback: CallbackQuery) -> None:
         return
 
     data_id = callback.data
-    if data_id.startswith("split_"):
-        data = SPLITTERS_DATA.get(data_id)
-        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}" if data else "Topilmadi."
-        await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
-    elif data_id.startswith("uch_"):
+    if data_id.startswith("uch_"):
         data = UCHASKA_10_DATA.get(data_id)
         text = f"🏢 <b>{data['name']}</b>\n📌 Holati: {data['status']}\n⚡ Signal: {data['signal']}" if data else "Topilmadi."
         await callback.message.answer(text, parse_mode=ParseMode.HTML)
