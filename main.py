@@ -21,15 +21,13 @@ from aiogram.types import (
 TOKEN = "9125362206:AAF4zONlkd5e81kfoZthNBTkwQ8TRa5-UQY"
 dp = Dispatcher()
 
-# Admin Telegram ID raqami va parol
 ADMIN_ID = 51975910
 SECRET_PASSWORD = "3939"
 
-# Tasdiqlangan foydalanuvchilar
 authorized_users = set()
 search_state = set()
 
-# Yangi Excel fayldan Xonqa shahar va qishloq splitterlarini yuklab olish
+# Excel fayldan ma'lumotlarni yuklash
 EXCEL_FILE = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 splitters_list = []
 
@@ -50,11 +48,13 @@ try:
                     "town": str(row.get('Населенный пункт', '')),
                     "real_sn": str(row.get('Серийный номер', ''))
                 })
-            print(f"✅ Yangi fayldan {len(splitters_list)} ta splitter va uskunalar yuklandi.")
+            print(f"✅ Fayldan {len(splitters_list)} ta splitter va uskunalar yuklandi.")
 except Exception as e:
     print(f"❌ Excel faylni o'qishda xatolik: {e}")
 
-# 10-uchaska manzillari bazasi
+# Qishloq va shaharchalar ro'yxati
+TOWNS_LIST = sorted(list(set(s['town'] for s in splitters_list if s['town'] and s['town'] != 'nan')))
+
 UCHASKA_10_DATA = {
     "uch_1": {"name": "Ёрқин Юлдуз-2 берк кўчаси", "status": "Uzluksiz xizmat ko'rsatishda", "signal": "Normal (-19 dBm)"},
     "uch_2": {"name": "Олажа қишлоғи, Yorqin yulduz уй", "status": "Faol", "signal": "Yaxshi (-20 dBm)"},
@@ -67,7 +67,6 @@ UCHASKA_10_DATA = {
     "uch_9": {"name": "Олажа қишлоғи, Буюк ипак йўли 3- йўлак кўчаси", "status": "Faol", "signal": "Normal (-22 dBm)"},
 }
 
-# Elektramontyorlar bazasi
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Xonqa tumani, Markaziy MFY", "task": "Optik tarmoqlarni tortish, svarka qilish va abonentlarni ulash."},
     "elect_2": {"name": "Отабоев Рамзиддин Рахматилло угли", "phone": "+998995603938", "zone": "Xonqa tumani, Paxtakor MFY", "task": "Beton stalbalarda ishlash, drop kabel tortish va routerlarni sozlash."},
@@ -99,19 +98,20 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="⚡ Splitter qidirish")
         ],
         [
-            KeyboardButton(text="🏢 10-uchaska obyektlari"),
-            KeyboardButton(text="👷 Elektramontyorlar")
+            KeyboardButton(text="🏘 Qishloq va shaharchalar"),
+            KeyboardButton(text="🏢 10-uchaska obyektlari")
         ],
         [
-            KeyboardButton(text="🛠 Xizmatlar va murojaat"),
-            KeyboardButton(text="📞 Bog'lanish")
+            KeyboardButton(text="👷 Elektramontyorlar"),
+            KeyboardButton(text="🛠 Xizmatlar va murojaat")
         ],
         [
             KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
             KeyboardButton(text="🗺 GeoWFM Xarita", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geowfm/#/map/employee/search"))
         ],
         [
-            KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/"))
+            KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/")),
+            KeyboardButton(text="📞 Bog'lanish")
         ]
     ],
     resize_keyboard=True
@@ -144,6 +144,7 @@ async def text_handler(message: Message) -> None:
         if user_id in search_state:
             search_state.remove(user_id)
             query = text.lower()
+            keywords = [k.strip() for k in query.split(',')]
             
             found = []
             for s in splitters_list:
@@ -153,7 +154,12 @@ async def text_handler(message: Message) -> None:
                 town = s['town'].lower()
                 sn = s['real_sn'].lower()
                 
-                if query in num or query in splitter_info or query in addr or query in town or query in sn:
+                match_all = True
+                for kw in keywords:
+                    if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
+                        match_all = False
+                        break
+                if match_all:
                     found.append(s)
 
             if not found:
@@ -162,9 +168,9 @@ async def text_handler(message: Message) -> None:
                 response = f"🔍 <b>Qidiruv natijalari (Jami topildi: {len(found)} ta):</b>\n\n"
                 for item in found[:10]:
                     response += (
-                        f"📍 <b>Hudud / Qishloq:</b> {item['town']}\n"
-                        f"🏷 <b>Raqami / Nomi:</b> {item['number']} - {item['splitter']}\n"
-                        f"⚙️ <b>Model:</b> {item['model']}\n"
+                        f"📍 <b>Hudud:</b> {item['town']}\n"
+                        f"🏷 <b>Nomi:</b> {item['number']}\n"
+                        f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
                         f"🔢 <b>Seriya raqami:</b> {item['real_sn']}\n"
                         f"-----------------------------------\n"
@@ -186,7 +192,12 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Splitter qidirish":
             search_state.add(user_id)
-            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini, splitter raqamini yoki ko'chani kiriting (masalan: <code>1/1/2</code>, <code>Мадир</code> yoki <code>Олажа</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini va raqamni kiriting (masalan: <code>Олажа</code> yoki <code>Мадир, 1/1/2</code>):", parse_mode=ParseMode.HTML)
+        elif text == "🏘 Qishloq va shaharchalar":
+            buttons = []
+            for t in TOWNS_LIST:
+                buttons.append([InlineKeyboardButton(text=f"🏘 {t}", callback_data=f"town_{t}")])
+            await message.answer("<b>Xonqa tumanidagi qishloq va shaharchalar:</b>\nKerakli hududni tanlang:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         elif text == "🏢 10-uchaska obyektlari":
             buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
             await message.answer("<b>10-uchaska hududlari va manzillari:</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -214,7 +225,23 @@ async def callback_handler(callback: CallbackQuery) -> None:
         return
 
     data_id = callback.data
-    if data_id.startswith("uch_"):
+    if data_id.startswith("town_"):
+        town_name = data_id.replace("town_", "")
+        found = [s for s in splitters_list if s['town'] == town_name]
+        
+        response = f"🏘 <b>{town_name} bo'yicha splitterlar (Jami: {len(found)} ta):</b>\n\n"
+        for item in found[:10]:
+            response += (
+                f"🏷 <b>Nomi:</b> {item['number']}\n"
+                f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
+                f"🏠 <b>Manzil:</b> {item['address']}\n"
+                f"🔢 <b>Seriya raqami:</b> {item['real_sn']}\n"
+                f"-----------------------------------\n"
+            )
+        if len(found) > 10:
+            response += f"\n<i>Natijalar ko'p ({len(found)} ta), faqat dastlabki 10 tasi ko'rsatildi. Aniqroq qidirish uchun '⚡ Splitter qidirish' dan foydalaning.</i>"
+        await callback.message.answer(response, parse_mode=ParseMode.HTML)
+    elif data_id.startswith("uch_"):
         data = UCHASKA_10_DATA.get(data_id)
         text = f"🏢 <b>{data['name']}</b>\n📌 Holati: {data['status']}\n⚡ Signal: {data['signal']}" if data else "Topilmadi."
         await callback.message.answer(text, parse_mode=ParseMode.HTML)
