@@ -17,14 +17,15 @@ from aiogram.types import (
     WebAppInfo
 )
 
-TOKEN = "9125362206:AAHyIEixDL2aLXnjwcJ2qSfjcVpGwQ4IwB4"
+TOKEN = "9125362206:AAF4zONlkd5e81kfoZthNBTkwQ8TRa5-UQY"
 dp = Dispatcher()
 
-# Admin Telegram ID raqami
+# Admin Telegram ID raqami va parol
 ADMIN_ID = 51975910
+SECRET_PASSWORD = "3939"
 
-# Foydalanuvchilar ro'yxatini saqlash
-active_users = set()
+# Tasdiqlangan (parolni kiritgan) foydalanuvchilar bazasi
+authorized_users = set()
 
 # 10-uchaska manzillari bazasi
 UCHASKA_10_DATA = {
@@ -110,178 +111,89 @@ keyboard = ReplyKeyboardMarkup(
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Kechirasiz, bu bot faqat mas'ul xodimlar uchun yopiq rejimda ishlaydi.")
-        return
-
-    user = message.from_user
-    user_info = f"👤 {user.full_name} (ID: <code>{user.id}</code>)"
-    active_users.add(user_info)
-    
-    user_name = html.quote(user.first_name)
-    await message.answer(
-        f"Assalomu alaykum, {user_name}!\n"
-        f"<b>@STP_Xonqa_bot</b> xizmatingizga tayyor. Kerakli bo'limni tanlang:",
-        reply_markup=keyboard
-    )
+    if message.from_user.id == ADMIN_ID or message.from_user.id in authorized_users:
+        user_name = html.quote(message.from_user.first_name)
+        await message.answer(
+            f"Assalomu alaykum, {user_name}!\n"
+            f"<b>@STP_Xonqa_bot</b> xizmatingizga tayyor. Kerakli bo'limni tanlang:",
+            reply_markup=keyboard
+        )
+    else:
+        await message.answer("🔐 Assalomu alaykum! Botdan foydalanish uchun maxfiy parolni kiriting:")
 
 @dp.message(Command("stats"))
 async def stats_handler(message: Message) -> None:
     if message.from_user.id != ADMIN_ID:
         return
-        
-    if not active_users:
-        await message.answer("Hozircha botga ulangan foydalanuvchilar yo'q.")
+    if not authorized_users:
+        await message.answer("Hozircha parolni kiritib ulangan xodimlar yo'q.")
         return
-    
-    users_list = "\n".join(active_users)
-    await message.answer(
-        f"📊 <b>Botga ulangan foydalanuvchilar (Jami: {len(active_users)} ta):</b>\n\n{users_list}",
-        parse_mode=ParseMode.HTML
-    )
-
-@dp.message(F.text == "🌐 Internet tariflari")
-async def internet_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    text = (
-        "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
-        "🔥 <b>Hammasi birga 4</b>\n"
-        "• Internet tezligi: 500 Mbit/s\n"
-        "• IP-telefoniya abonent to'lovi: 25 000 so'm/oyiga\n"
-        "• Trafik: Cheksiz\n"
-        "💰 <b>Narxi: 500 000 so'm/oyiga</b>\n\n"
-        "🔥 <b>Hammasi birga 3+</b>\n"
-        "• Internet tezligi: 350 Mbit/s\n"
-        "• IP-telefoniya abonent to'lovi: 25 000 so'm/oyiga\n"
-        "• Trafik: Cheksiz\n"
-        "💰 <b>Narxi: 350 000 so'm/oyiga</b>\n\n"
-        "🔥 <b>Hammasi birga 3</b>\n"
-        "• Internet tezligi: 250 Mbit/s\n"
-        "• IP-telefoniya abonent to'lovi: 25 000 so'm/oyiga\n"
-        "• Trafik: Cheksiz\n"
-        "💰 <b>Narxi: 215 000 so'm/oyiga</b>\n\n"
-        "🔥 <b>Hammasi birga 2+</b>\n"
-        "• Internet tezligi: 150 Mbit/s\n"
-        "• IP-telefoniya abonent to'lovi: 25 000 so'm/oyiga\n"
-        "• Trafik: Cheksiz\n"
-        "💰 <b>Narxi: 175 000 so'm/oyiga</b>\n\n"
-        "📞 Ulanish uchun mas'ul: +998995603937"
-    )
-    await message.answer(text, parse_mode=ParseMode.HTML)
-
-@dp.message(F.text == "⚡ Splitterlar va abonentlar")
-async def splitters_menu(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    inline_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
-            [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")]
-        ]
-    )
-    await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("split_"))
-async def process_splitter_callback(callback: CallbackQuery) -> None:
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Ruxsat yo'q!", show_alert=True)
-        return
-    splitter_id = callback.data
-    data = SPLITTERS_DATA.get(splitter_id)
-    if data:
-        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}"
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "🏢 10-uchaska obyektlari")
-async def uchaska_menu(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    buttons = []
-    for key, val in UCHASKA_10_DATA.items():
-        buttons.append([InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)])
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer("<b>10-uchaska hududlari va manzillari:</b>\nKerakli manzilni tanlang:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("uch_"))
-async def process_uchaska_callback(callback: CallbackQuery) -> None:
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Ruxsat yo'q!", show_alert=True)
-        return
-    uch_id = callback.data
-    data = UCHASKA_10_DATA.get(uch_id)
-    if data:
-        text = (
-            f"🏢 <b>Obyekt / Manzil:</b> {data['name']}\n"
-            f"📌 <b>Holati:</b> {data['status']}\n"
-            f"⚡ <b>Signal darajasi:</b> {data['signal']}"
-        )
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "👷 Elektramontyorlar")
-async def electricians_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    buttons = []
-    for key, val in ELECTRICIANS_DATA.items():
-        buttons.append([InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)])
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer("Xonqa tumanidagi elektramontyorlar ro'yxati. Xodim haqida ma'lumot olish uchun uning ustiga bosing:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("elect_"))
-async def process_electrician_callback(callback: CallbackQuery) -> None:
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Ruxsat yo'q!", show_alert=True)
-        return
-    elect_id = callback.data
-    data = ELECTRICIANS_DATA.get(elect_id)
-    if data:
-        text = (
-            f"👷 <b>Elektramontyor:</b> {data['name']}\n"
-            f"📞 <b>Telefon raqami:</b> {data['phone']}\n"
-            f"📍 <b>Xizmat ko'rsatish zonasi:</b> {data['zone']}\n"
-            f"🛠 <b>Vazifasi / Qiladigan ishi:</b> {data['task']}"
-        )
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "🛠 Xizmatlar va murojaat")
-async def services_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    await message.answer(
-        "<b>Texnik xizmatlar va o'rnatish:</b>\n"
-        "• Optik fiber svarka\n"
-        "• Beton stalbalarda ishlash va drop kabel tortish\n"
-        "• 1x2 va 1x16 splitterlarda signalni tekshirish\n"
-        "• ZTE ZXHN F6600P va TP-Link routerlarini sozlash\n\n"
-        "Murojaat uchun tel: +998995603937"
-    )
-
-@dp.message(F.text == "📞 Bog'lanish")
-async def contact_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
-        return
-    await message.answer(
-        "📞 <b>Aloqa ma'lumotlari:</b>\n"
-        "• Mas'ul: Elektramontyor\n"
-        "• Telefon: +998995603937\n"
-        "• Hudud: Xonqa tumani, Xorazm"
-    )
+    await message.answer(f"📊 Parolni kiritib ulangan xodimlar soni: {len(authorized_users)} ta")
 
 @dp.message()
-async def echo_handler(message: Message) -> None:
-    if message.from_user.id != ADMIN_ID:
+async def text_handler(message: Message) -> None:
+    user_id = message.from_user.id
+    text = message.text.strip()
+
+    if user_id == ADMIN_ID or user_id in authorized_users:
+        if text == "🌐 Internet tariflari":
+            await message.answer(
+                "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
+                "🔥 <b>Hammasi birga 4</b>\n• Internet tezligi: 500 Mbit/s\n• Narxi: 500 000 so'm/oyiga\n\n"
+                "🔥 <b>Hammasi birga 3+</b>\n• Internet tezligi: 350 Mbit/s\n• Narxi: 350 000 so'm/oyiga\n\n"
+                "🔥 <b>Hammasi birga 3</b>\n• Internet tezligi: 250 Mbit/s\n• Narxi: 215 000 so'm/oyiga\n\n"
+                "🔥 <b>Hammasi birga 2+</b>\n• Internet tezligi: 150 Mbit/s\n• Narxi: 175 000 so'm/oyiga\n\n"
+                "📞 Ulanish uchun mas'ul: +998995603937",
+                parse_mode=ParseMode.HTML
+            )
+        elif text == "⚡ Splitterlar va abonentlar":
+            inline_kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
+                    [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")]
+                ]
+            )
+            await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
+        elif text == "🏢 10-uchaska obyektlari":
+            buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
+            await message.answer("<b>10-uchaska hududlari va manzillari:</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        elif text == "👷 Elektramontyorlar":
+            buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
+            await message.answer("Xonqa tumanidagi elektramontyorlar ro'yxati:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+        elif text == "🛠 Xizmatlar va murojaat":
+            await message.answer("<b>Texnik xizmatlar va o'rnatish:</b>\n• Optik fiber svarka\n• Beton stalbalarda ishlash\nMurojaat: +998995603937")
+        elif text == "📞 Bog'lanish":
+            await message.answer("📞 <b>Aloqa:</b> +998995603937 (Xonqa tumani)")
+        else:
+            await message.answer("Tushunarsiz buyruq. Menyudagi tugmalardan foydalaning.")
+    else:
+        if text == SECRET_PASSWORD:
+            authorized_users.add(user_id)
+            await message.answer("✅ Parol to'g'ri! Xush kelibsiz. Quyidagi menyudan foydalanishingiz mumkin:", reply_markup=keyboard)
+        else:
+            await message.answer("❌ Noto'g'ri parol! Iltimos, to'g'ri parolni kiriting:")
+
+@dp.callback_query()
+async def callback_handler(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    if user_id != ADMIN_ID and user_id not in authorized_users:
+        await callback.answer("Ruxsat yo'q!", show_alert=True)
         return
-    await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
+
+    data_id = callback.data
+    if data_id.startswith("split_"):
+        data = SPLITTERS_DATA.get(data_id)
+        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}" if data else "Topilmadi."
+        await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+    elif data_id.startswith("uch_"):
+        data = UCHASKA_10_DATA.get(data_id)
+        text = f"🏢 <b>{data['name']}</b>\n📌 Holati: {data['status']}\n⚡ Signal: {data['signal']}" if data else "Topilmadi."
+        await callback.message.answer(text, parse_mode=ParseMode.HTML)
+    elif data_id.startswith("elect_"):
+        data = ELECTRICIANS_DATA.get(data_id)
+        text = f"👷 <b>{data['name']}</b>\n📞 Tel: {data['phone']}\n📍 Zona: {data['zone']}\n🛠 Vazifa: {data['task']}" if data else "Topilmadi."
+        await callback.message.answer(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
 
 # Render uchun veb-server
 async def handle_ping(request):
