@@ -89,7 +89,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu
+# Asosiy menyu (GeoWFM filtrlash havolasi bilan)
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -106,7 +106,7 @@ keyboard = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
-            KeyboardButton(text="🗺 GeoWFM Xarita", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geowfm/#/map/employee/search"))
+            KeyboardButton(text="🗺 GeoWFM Xarita", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geoutr/equipments/filter"))
         ],
         [
             KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/")),
@@ -153,7 +153,6 @@ async def text_handler(message: Message) -> None:
                 town = s['town'].lower()
                 sn = s['real_sn'].lower()
                 
-                # Mos kelishni tekshirish (kalit so'zlardan biri topilsa ham qabul qiladi)
                 match_any = True
                 for kw in keywords:
                     if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
