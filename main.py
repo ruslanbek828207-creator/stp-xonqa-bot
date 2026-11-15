@@ -104,4 +104,102 @@ async def command_start_handler(message: Message) -> None:
 @dp.message(F.text == "🌐 Internet tariflari")
 async def internet_handler(message: Message) -> None:
     await message.answer(
-        "<b>UZTELECOM Home Internet
+        "<b>UZTELECOM Home Internet tariflari (Xonqa):</b>\n\n"
+        "• 100 Mb/s - Yuqori tezlikdagi optik internet\n"
+        "• 200 Mb/s - Qulay paket\n"
+        "• 1 Gbit/s - Super tezlik!\n\n"
+        "Ulanish uchun operator bilan bog'laning: +998995603937"
+    )
+
+@dp.message(F.text == "⚡ Splitterlar va abonentlar")
+async def splitters_menu(message: Message) -> None:
+    inline_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
+            [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")],
+            [InlineKeyboardButton(text="🔸 Splitter 1x16 №2 (Paxtakor)", callback_data="split_1x16_2")]
+        ]
+    )
+    await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("split_"))
+async def process_splitter_callback(callback: CallbackQuery) -> None:
+    splitter_id = callback.data
+    data = SPLITTERS_DATA.get(splitter_id)
+    
+    if data:
+        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}"
+    else:
+        text = "Ma'lumot topilmadi."
+        
+    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "👷 Elektramontyorlar")
+async def electricians_handler(message: Message) -> None:
+    buttons = []
+    for key, val in ELECTRICIANS_DATA.items():
+        buttons.append([InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)])
+    
+    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer("Xonqa tumanidagi elektramontyorlar ro'yxati. Kerakli xodimni tanlang:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("elect_"))
+async def process_electrician_callback(callback: CallbackQuery) -> None:
+    elect_id = callback.data
+    data = ELECTRICIANS_DATA.get(elect_id)
+    
+    if data:
+        text = f"👷 <b>Elektramontyor:</b> {data['name']}\n📞 <b>Telefon raqami:</b> {data['phone']}"
+    else:
+        text = "Ma'lumot topilmadi."
+        
+    await callback.message.answer(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "🛠 Xizmatlar va murojaat")
+async def services_handler(message: Message) -> None:
+    await message.answer(
+        "<b>Texnik xizmatlar va o'rnatish:</b>\n"
+        "• Optik fiber svarka\n"
+        "• Beton stalbalarda ishlash va drop kabel tortish\n"
+        "• 1x2 va 1x16 splitterlarda signalni tekshirish\n"
+        "• ZTE ZXHN F6600P va TP-Link routerlarini sozlash\n\n"
+        "Murojaat uchun tel: +998995603937"
+    )
+
+@dp.message(F.text == "📞 Bog'lanish")
+async def contact_handler(message: Message) -> None:
+    await message.answer(
+        "📞 <b>Aloqa ma'lumotlari:</b>\n"
+        "• Mas'ul: Elektramontyor\n"
+        "• Telefon: +998995603937\n"
+        "• Hudud: Xonqa tumani, Xorazm"
+    )
+
+@dp.message()
+async def echo_handler(message: Message) -> None:
+    await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
+
+# Render.com va UptimeRobot uchun kichik veb-server
+async def handle_ping(request):
+    return web.Response(text="Bot ishlayapti!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+async def main() -> None:
+    await start_web_server()
+    bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    asyncio.run(main())
