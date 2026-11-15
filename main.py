@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from aiohttp import web
-from aiogram import Bot, Dispatcher, html
+from aiogram import Bot, Dispatcher, html, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
@@ -11,24 +11,54 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery,
     WebAppInfo
 )
 
 TOKEN = "9125362206:AAFzP3W9w9cfHSqa0ymoZpW0mpKP6eISpj8"
 dp = Dispatcher()
 
-# Asosiy menyu tugmalari (OSS Portal va Geowfm Telegram ichida ochiladi)
+# Abonentlar bazasi (Splitterlar bo'yicha matn shaklida)
+SPLITTERS_DATA = {
+    "split_1x2_1": {
+        "name": "Splitter 1x2 №1 (Markaz)",
+        "info": "Signal darajasi: Normal (-18 dBm)\n\n"
+                "<b>Ulangan abonentlar:</b>\n"
+                "1. Ismoilov Anvar - 15-uy (Tel: +998901234567)\n"
+                "2. Matyakubov Baxtiyor - 18-uy (Tel: +998919876543)"
+    },
+    "split_1x16_1": {
+        "name": "Splitter 1x16 №1 (Xonqa ko'cha)",
+        "info": "Signal darajasi: Yaxshi (-21 dBm)\n\n"
+                "<b>Ulangan abonentlar:</b>\n"
+                "1. Jumaniyozov Jasur - 4-uy (Tel: +998931112233)\n"
+                "2. Raximov Farhod - 12-uy (Tel: +998974445566)\n"
+                "3. Bobojonov Rustam - 25-uy (Tel: +998997778899)"
+    },
+    "split_1x16_2": {
+        "name": "Splitter 1x16 №2 (Paxtakor)",
+        "info": "Signal darajasi: O'rtacha (-24 dBm)\n\n"
+                "<b>Ulangan abonentlar:</b>\n"
+                "1. Sobirov Sherzod - 7-uy (Tel: +998905554433)\n"
+                "2. Yusupov Dilshod - 19-uy (Tel: +998912223344)"
+    }
+}
+
+# Asosiy menyu tugmalari
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="🌐 Internet tariflari"),
-            KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/"))
+            KeyboardButton(text="⚡ Splitterlar va abonentlar")
         ],
         [
-            KeyboardButton(text="🗺 Geowfm Xarita", web_app=WebAppInfo(url="https://geofm.uztelecom.uz/geoutr/equipments/list")),
-            KeyboardButton(text="🛠 Xizmatlar va murojaat")
+            KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
+            KeyboardButton(text="🗺 Geowfm Xarita", web_app=WebAppInfo(url="https://geofm.uztelecom.uz/geoutr/equipments/list"))
         ],
         [
+            KeyboardButton(text="🛠 Xizmatlar va murojaat"),
             KeyboardButton(text="📞 Bog'lanish")
         ]
     ],
@@ -44,7 +74,7 @@ async def command_start_handler(message: Message) -> None:
         reply_markup=keyboard
     )
 
-@dp.message(lambda message: message.text == "🌐 Internet tariflari")
+@dp.message(F.text == "🌐 Internet tariflari")
 async def internet_handler(message: Message) -> None:
     await message.answer(
         "<b>UZTELECOM Home Internet tariflari (Xonqa):</b>\n\n"
@@ -54,7 +84,32 @@ async def internet_handler(message: Message) -> None:
         "Ulanish uchun operator bilan bog'laning: +998995603937"
     )
 
-@dp.message(lambda message: message.text == "🛠 Xizmatlar va murojaat")
+@dp.message(F.text == "⚡ Splitterlar va abonentlar")
+async def splitters_menu(message: Message) -> None:
+    # Splitterlarni tanlash uchun inline tugmalar
+    inline_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔹 Splitter 1x2 №1 (Markaz)", callback_data="split_1x2_1")],
+            [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")],
+            [InlineKeyboardButton(text="🔸 Splitter 1x16 №2 (Paxtakor)", callback_data="split_1x16_2")]
+        ]
+    )
+    await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
+
+@dp.callback_query(F.data.startswith("split_"))
+async def process_splitter_callback(callback: CallbackQuery) -> None:
+    splitter_id = callback.data
+    data = SPLITTERS_DATA.get(splitter_id)
+    
+    if data:
+        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}"
+    else:
+        text = "Ma'lumot topilmadi."
+        
+    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.message(F.text == "🛠 Xizmatlar va murojaat")
 async def services_handler(message: Message) -> None:
     await message.answer(
         "<b>Texnik xizmatlar va o'rnatish:</b>\n"
@@ -65,7 +120,7 @@ async def services_handler(message: Message) -> None:
         "Murojaat uchun tel: +998995603937"
     )
 
-@dp.message(lambda message: message.text == "📞 Bog'lanish")
+@dp.message(F.text == "📞 Bog'lanish")
 async def contact_handler(message: Message) -> None:
     await message.answer(
         "📞 <b>Aloqa ma'lumotlari:</b>\n"
