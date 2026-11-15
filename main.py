@@ -6,7 +6,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, html, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
@@ -19,6 +19,9 @@ from aiogram.types import (
 
 TOKEN = "9125362206:AAGSRlOCTy_vJRU7t5VGJyLZ3ArmdfAWtZs"
 dp = Dispatcher()
+
+# Foydalanuvchilar ro'yxatini xotirada saqlash uchun to'plam (Set)
+active_users = set()
 
 # 10-uchaska manzillari bazasi
 UCHASKA_10_DATA = {
@@ -104,11 +107,28 @@ keyboard = ReplyKeyboardMarkup(
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    user_name = html.quote(message.from_user.first_name)
+    user = message.from_user
+    user_info = f"👤 {user.full_name} (ID: <code>{user.id}</code>)"
+    active_users.add(user_info)
+    
+    user_name = html.quote(user.first_name)
     await message.answer(
         f"Assalomu alaykum, {user_name}!\n"
         f"<b>@STP_Xonqa_bot</b> xizmatingizga tayyor. Kerakli bo'limni tanlang:",
         reply_markup=keyboard
+    )
+
+# Kimlar ulanganni ko'rish uchun maxfiy buyruq: /stats
+@dp.message(Command("stats"))
+async def stats_handler(message: Message) -> None:
+    if not active_users:
+        await message.answer("Hozircha botga ulangan foydalanuvchilar yo'q.")
+        return
+    
+    users_list = "\n".join(active_users)
+    await message.answer(
+        f"📊 <b>Botga ulangan foydalanuvchilar (Jami: {len(active_users)} ta):</b>\n\n{users_list}",
+        parse_mode=ParseMode.HTML
     )
 
 @dp.message(F.text == "🌐 Internet tariflari")
@@ -147,109 +167,3 @@ async def splitters_menu(message: Message) -> None:
             [InlineKeyboardButton(text="🔸 Splitter 1x16 №1 (Xonqa)", callback_data="split_1x16_1")]
         ]
     )
-    await message.answer("Tekshirmoqchi bo'lgan splitter yoki muftani tanlang:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("split_"))
-async def process_splitter_callback(callback: CallbackQuery) -> None:
-    splitter_id = callback.data
-    data = SPLITTERS_DATA.get(splitter_id)
-    if data:
-        text = f"📍 <b>{data['name']}</b>\n\n{data['info']}"
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "🏢 10-uchaska obyektlari")
-async def uchaska_menu(message: Message) -> None:
-    buttons = []
-    for key, val in UCHASKA_10_DATA.items():
-        buttons.append([InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)])
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer("<b>10-uchaska hududlari va manzillari:</b>\nKerakli manzilni tanlang:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("uch_"))
-async def process_uchaska_callback(callback: CallbackQuery) -> None:
-    uch_id = callback.data
-    data = UCHASKA_10_DATA.get(uch_id)
-    if data:
-        text = (
-            f"🏢 <b>Obyekt / Manzil:</b> {data['name']}\n"
-            f"📌 <b>Holati:</b> {data['status']}\n"
-            f"⚡ <b>Signal darajasi:</b> {data['signal']}"
-        )
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "👷 Elektramontyorlar")
-async def electricians_handler(message: Message) -> None:
-    buttons = []
-    for key, val in ELECTRICIANS_DATA.items():
-        buttons.append([InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)])
-    inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer("Xonqa tumanidagi elektramontyorlar ro'yxati. Xodim haqida ma'lumot olish uchun uning ustiga bosing:", reply_markup=inline_kb)
-
-@dp.callback_query(F.data.startswith("elect_"))
-async def process_electrician_callback(callback: CallbackQuery) -> None:
-    elect_id = callback.data
-    data = ELECTRICIANS_DATA.get(elect_id)
-    if data:
-        text = (
-            f"👷 <b>Elektramontyor:</b> {data['name']}\n"
-            f"📞 <b>Telefon raqami:</b> {data['phone']}\n"
-            f"📍 <b>Xizmat ko'rsatish zonasi:</b> {data['zone']}\n"
-            f"🛠 <b>Vazifasi / Qiladigan ishi:</b> {data['task']}"
-        )
-    else:
-        text = "Ma'lumot topilmadi."
-    await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.message(F.text == "🛠 Xizmatlar va murojaat")
-async def services_handler(message: Message) -> None:
-    await message.answer(
-        "<b>Texnik xizmatlar va o'rnatish:</b>\n"
-        "• Optik fiber svarka\n"
-        "• Beton stalbalarda ishlash va drop kabel tortish\n"
-        "• 1x2 va 1x16 splitterlarda signalni tekshirish\n"
-        "• ZTE ZXHN F6600P va TP-Link routerlarini sozlash\n\n"
-        "Murojaat uchun tel: +998995603937"
-    )
-
-@dp.message(F.text == "📞 Bog'lanish")
-async def contact_handler(message: Message) -> None:
-    await message.answer(
-        "📞 <b>Aloqa ma'lumotlari:</b>\n"
-        "• Mas'ul: Elektramontyor\n"
-        "• Telefon: +998995603937\n"
-        "• Hudud: Xonqa tumani, Xorazm"
-    )
-
-@dp.message()
-async def echo_handler(message: Message) -> None:
-    await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
-
-# Render port talabi uchun veb-server
-async def handle_ping(request):
-    return web.Response(text="Bot ishlayapti!")
-
-async def web_server_runner():
-    app = web.Application()
-    app.router.add_get("/", handle_ping)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 10000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-
-async def main() -> None:
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    await web_server_runner()
-    bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
