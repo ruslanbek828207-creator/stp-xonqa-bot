@@ -76,7 +76,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu tugmalari (MSMS qo'shilgan holda)
+# Asosiy menyu tugmalari
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -231,6 +231,7 @@ async def contact_handler(message: Message) -> None:
 async def echo_handler(message: Message) -> None:
     await message.answer("Tushunarsiz buyruq. Iltimos, menyudagi tugmalardan foydalaning.")
 
+# Render port talabi uchun veb-server
 async def handle_ping(request):
     return web.Response(text="Bot ishlayapti!")
 
