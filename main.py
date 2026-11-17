@@ -27,7 +27,8 @@ SECRET_PASSWORD = "3939"
 authorized_users = set()
 search_state = set()
 
-EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
+# Янги юборилган сплиттерлар ва абонентлар файл номлари
+EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s_2.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 
 splitters_list = []
@@ -57,7 +58,7 @@ try:
                     })
         print(f"✅ Сплиттерлар юкланди: {len(splitters_list)} та")
 except Exception as e:
-    print(f"❌ Сплиттер файлини ўқиishда хатолик: {e}")
+    print(f"❌ Сплиттер файлини ўқишда хатолик: {e}")
 
 # Абонентлар базасини ўқиш
 try:
@@ -88,7 +89,7 @@ try:
                     })
         print(f"✅ Абонентлар базаси юкланди: {len(subscribers_list)} та")
 except Exception as e:
-    print(f"❌ Абонентлар файлини ўқиishда хатолик: {e}")
+    print(f"❌ Абонентлар файлини ўқишда хатолик: {e}")
 
 TOWNS_LIST = sorted(list(set(s['town'] for s in splitters_list if s['town'] and s['town'] != 'nan')))
 
@@ -162,7 +163,7 @@ async def command_start_handler(message: Message) -> None:
         user_name = html.quote(message.from_user.first_name)
         await message.answer(
             f"Ассалому алайкум, {user_name}!\n"
-            f"<b>@STP_Xonqa_bot</b> хizmatingizga tayyor. Керакли бўлимни танланг:",
+            f"<b>@STP_Xonqa_bot</b> хизматингизга тайёр. Керакли бўлимни танланг:",
             reply_markup=keyboard
         )
     else:
@@ -206,7 +207,7 @@ async def text_handler(message: Message) -> None:
                     row = []
             if row:
                 buttons.append(row)
-            await message.answer("<b>Хонқа туманидаги қишлоқ ва шаҳарчалар:</b>\nКеракли ҳудудни танlang:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+            await message.answer("<b>Хонқа туманидаги қишлоқ ва шаҳарчалар:</b>\nКеракли ҳудудни танланг:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         elif text == "🏢 10-учаска объектлари":
             buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
             await message.answer("<b>10-учаска ҳудудлари ва манзиллари:</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
