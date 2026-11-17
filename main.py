@@ -54,15 +54,15 @@ try:
 except Exception as e:
     print(f"❌ Splitter faylini o'qishda xatolik: {e}")
 
-# Abonentlar bazasini o'qish (Barcha varaqlarni / Sheetlarni qo'llab-quvvatlash uchun)
+# Abonentlar bazasini o'qish (Barcha varaqlarni va Login ustunini to'liq qo'llab-quvvatlash)
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
         for sheet_name in xls.sheet_names:
             df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name=sheet_name)
             for _, row in df_sub.iterrows():
-                # MSISDN, Login, Telefon yoki Client ustunlaridan ma'lumotlarni xavfsiz olish
-                client_name = str(row.get('CLIENT', '') or row.get('Client', '') or 'Nomaʼlum')
+                client_name = str(row.get('CLIENT', '') or row.get('Client', '') or '')
+                login_val = str(row.get('Login', '') or row.get('login', '') or '')
                 phone_num = str(row.get('PHONE', '') or row.get('Phone', '') or '-')
                 msisdn_val = str(row.get('MSISDN', '') or '')
                 address_val = str(row.get('Прописка', '') or row.get('Address', '') or '-')
@@ -70,15 +70,16 @@ try:
                 rate_plan = str(row.get('RATE_PLAN', '') or '-')
                 status_val = str(row.get('RT_LC_STATES', '') or '-')
 
-                if client_name and client_name != 'nan':
+                if (client_name and client_name != 'nan') or (login_val and login_val != 'nan'):
                     subscribers_list.append({
-                        "client": client_name,
-                        "phone": phone_num,
-                        "msisdn": msisdn_val,
-                        "address": address_val,
-                        "balance": balance_val,
-                        "rate_plan": rate_plan,
-                        "status": status_val
+                        "client": client_name if client_name != 'nan' else 'Nomaʼlum',
+                        "login": login_val if login_val != 'nan' else '-',
+                        "phone": phone_num if phone_num != 'nan' else '-',
+                        "msisdn": msisdn_val if msisdn_val != 'nan' else '-',
+                        "address": address_val if address_val != 'nan' else '-',
+                        "balance": balance_val if balance_val != 'nan' else '0',
+                        "rate_plan": rate_plan if rate_plan != 'nan' else '-',
+                        "status": status_val if status_val != 'nan' else '-'
                     })
         print(f"✅ Abonentlar bazasi yuklandi: {len(subscribers_list)} ta")
 except Exception as e:
@@ -188,8 +189,7 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            # Abonent qidirish rejimi yoki to'g'ridan-to'g'ri qidiruvni boshlash
-            await message.answer("🔍 Abonent F.I.Sh., telefon raqami, MSISDN yoki manzilini yozing (masalan: <code>Sarvar</code> yoki <code>995443008</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Abonent Login (schot), F.I.Sh., telefon raqami yoki manzilini yozing (masalan: <code>m897730</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -253,15 +253,16 @@ async def text_handler(message: Message) -> None:
                     await message.answer(response, parse_mode=ParseMode.HTML)
                 return
 
-            # Abonentni F.I.Sh, Telefon, MSISDN yoki Manzil bo'yicha qidirish
+            # Abonentni Login, F.I.Sh, Telefon, MSISDN yoki Manzil bo'yicha qidirish
             query = text.lower().strip()
             found_subs = []
             for sub in subscribers_list:
+                log = sub['login'].lower()
                 cli = sub['client'].lower()
                 ph = sub['phone'].lower()
                 msisdn = sub['msisdn'].lower()
                 adr = sub['address'].lower()
-                if query in cli or query in ph or query in msisdn or query in adr:
+                if query in log or query in cli or query in ph or query in msisdn or query in adr:
                     found_subs.append(sub)
 
             if found_subs:
@@ -269,8 +270,8 @@ async def text_handler(message: Message) -> None:
                 for item in found_subs[:10]:
                     response += (
                         f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
+                        f"🔑 <b>Login:</b> <code>{item['login']}</code>\n"
                         f"📞 <b>Tel:</b> {item['phone']}\n"
-                        f"🆔 <b>MSISDN:</b> <code>{item['msisdn']}</code>\n"
                         f"📋 <b>Tarif:</b> {item['rate_plan']}\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
                         f"🟢 <b>Holati:</b> {item['status']}\n"
