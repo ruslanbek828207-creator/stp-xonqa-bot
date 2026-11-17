@@ -26,6 +26,7 @@ SECRET_PASSWORD = "3939"
 
 authorized_users = set()
 
+# Янги юборилган сплиттерлар ва абонентлар файл номлари
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 
