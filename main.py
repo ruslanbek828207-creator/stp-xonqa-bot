@@ -57,13 +57,12 @@ try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         df_sub = pd.read_excel(EXCEL_SUBSCRIBERS)
         for _, row in df_sub.iterrows():
-            log_val = str(row.get('Login', row.get('MSISDN', '')))
+            log_val = str(row.get('Login', ''))
             if log_val and log_val != 'nan':
                 subscribers_list.append({
                     "client": str(row.get('CLIENT', '')),
                     "login": log_val,
                     "phone": str(row.get('PHONE', '')),
-                    "rate": str(row.get('Tarif', row.get('RATE_PLAN', ''))),
                     "address": str(row.get('Прописка', '')),
                     "balance": str(row.get('Баланс', ''))
                 })
@@ -175,7 +174,7 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>b00004943794</code> yoki <code>m401085</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Abonent F.I.Sh., login yoki manzilini yozing (masalan: <code>Djobborov</code> yoki <code>m235795</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -199,6 +198,7 @@ async def text_handler(message: Message) -> None:
         elif text == "📞 Bog'lanish":
             await message.answer("📞 <b>Aloqa:</b> +998995603937 (Xonqa tumani)")
         else:
+            # Agar foydalanuvchi "⚡ Splitter qidirish" rejimida bo'lsa
             if user_id in search_state:
                 search_state.remove(user_id)
                 query = text.lower()
@@ -238,13 +238,15 @@ async def text_handler(message: Message) -> None:
                     await message.answer(response, parse_mode=ParseMode.HTML)
                 return
 
+            # Abonentni F.I.Sh, Login, Telefon yoki Manzil bo'yicha qidirish
             query = text.lower().strip()
             found_subs = []
             for sub in subscribers_list:
                 log = sub['login'].lower()
                 cli = sub['client'].lower()
                 ph = sub['phone'].lower()
-                if query in log or query in cli or query in ph or log in query:
+                adr = sub['address'].lower()
+                if query in log or query in cli or query in ph or query in adr:
                     found_subs.append(sub)
 
             if found_subs:
@@ -254,16 +256,15 @@ async def text_handler(message: Message) -> None:
                         f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
                         f"🔑 <b>Login / Schot:</b> <code>{item['login']}</code>\n"
                         f"📞 <b>Tel:</b> {item['phone']}\n"
-                        f"📦 <b>Tarif:</b> {item['rate']}\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
                         f"💰 <b>Balans:</b> {item['balance']} so'm\n"
                         f"-----------------------------------\n"
                     )
                 if len(found_subs) > 10:
-                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
+                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi. Aniqroq yozing.</i>"
                 await message.answer(response, parse_mode=ParseMode.HTML)
             else:
-                await message.answer("❌ Bunday abonent yoki splitter topilmadi. Loginni to'g'ri kiritganingizni tekshiring.")
+                await message.answer("❌ Bunday abonent yoki splitter topilmadi. Qaytadan tekshirib yozing.")
     else:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
