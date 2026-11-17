@@ -26,19 +26,22 @@ SECRET_PASSWORD = "3939"
 
 authorized_users = set()
 search_state = set()
+subscriber_search_state = set()
 
-# Excel fayldan ma'lumotlarni yuklash
-EXCEL_FILE = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
+# Excel fayllardan ma'lumotlarni yuklash
+EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
+EXCEL_SUBSCRIBERS = "62cef759-c553-4f4b-950c-b0ce38ffa2d3.xlsx"
+
 splitters_list = []
+subscribers_list = []
 
 try:
-    if os.path.exists(EXCEL_FILE):
-        df_raw = pd.read_excel(EXCEL_FILE, skiprows=11)
+    if os.path.exists(EXCEL_SPLITTERS):
+        df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
         if len(df_raw) > 1:
             col_names = df_raw.iloc[0].values
             df_data = df_raw.iloc[1:].copy()
             df_data.columns = col_names
-            
             for _, row in df_data.iterrows():
                 splitters_list.append({
                     "number": str(row.get('Номер оборуд.', '')),
@@ -48,9 +51,52 @@ try:
                     "town": str(row.get('Населенный пункт', '')),
                     "real_sn": str(row.get('Серийный номер', ''))
                 })
-            print(f"✅ Fayldan {len(splitters_list)} ta splitter va uskunalar yuklandi.")
+        print(f"✅ Splitterlar yuklandi: {len(splitters_list)} ta")
 except Exception as e:
-    print(f"❌ Excel faylni o'qishda xatolik: {e}")
+    print(f"❌ Splitter faylini o'qishda xatolik: {e}")
+
+try:
+    if os.path.exists(EXCEL_SUBSCRIBERS):
+        xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
+        for sheet in xls.sheet_names:
+            df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name=sheet)
+            # Xonqa bo'yicha filter yoki umumiy o'qish
+            for _, row in df_sub.iterrows():
+                # Ustun nomlarini moslashtirish
+                client_name = str(row.get('CLIENT', row.get(3, '')))
+                login = str(row.get('MSISDN', row.get(5, '')))
+                phone = str(row.get('PHONE', row.get(4, '')))
+                rate = str(row.get('RATE_PLAN', row.get(2, '')))
+                addr = str(row.get('Прописка', row.get(8, '')))
+                balance = str(row.get('Баланс', row.get(9, '')))
+                dept = str(row.get('DEPARTMENTS', row.get(1, '')))
+                
+                if 'Ханкинский' in dept or 'Ханкинский' in str(row.values) or sheet != 'Sheet1':
+                    subscribers_list.append({
+                        "client": client_name,
+                        "login": login,
+                        "phone": phone,
+                        "rate": rate,
+                        "address": addr,
+                        "balance": balance
+                    })
+        
+        # Shuningdek Sheet1'dagi Xonqa abonentlarini ham qo'shamiz
+        if 'Sheet1' in xls.sheet_names:
+            df_s1 = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name='Sheet1')
+            xonqa_s1 = df_s1[df_s1['DEPARTMENTS'].astype(str).str.contains('Ханкинский', case=False, na=False)]
+            for _, row in xonqa_s1.iterrows():
+                subscribers_list.append({
+                    "client": str(row.get('CLIENT', '')),
+                    "login": str(row.get('MSISDN', '')),
+                    "phone": str(row.get('PHONE', '')),
+                    "rate": str(row.get('RATE_PLAN', '')),
+                    "address": str(row.get('Прописка', '')),
+                    "balance": str(row.get('Баланс', ''))
+                })
+        print(f"✅ Abonentlar bazasi yuklandi: {len(subscribers_list)} ta")
+except Exception as e:
+    print(f"❌ Abonentlar faylini o'qishda xatolik: {e}")
 
 TOWNS_LIST = sorted(list(set(s['town'] for s in splitters_list if s['town'] and s['town'] != 'nan')))
 
@@ -89,7 +135,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu (GeoWFM filtrlash havolasi bilan)
+# Asosiy menyu (Abonent qidirish tugmasi qo'shildi)
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -97,20 +143,23 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="⚡ Splitter qidirish")
         ],
         [
-            KeyboardButton(text="🏘 Qishloq va shaharchalar"),
-            KeyboardButton(text="🏢 10-uchaska obyektlari")
+            KeyboardButton(text="🔍 Abonent qidirish"),
+            KeyboardButton(text="🏘 Qishloq va shaharchalar")
         ],
         [
-            KeyboardButton(text="👷 Elektramontyorlar"),
-            KeyboardButton(text="🛠 Xizmatlar va murojaat")
+            KeyboardButton(text="🏢 10-uchaska obyektlari"),
+            KeyboardButton(text="👷 Elektramontyorlar")
+        ],
+        [
+            KeyboardButton(text="🛠 Xizmatlar va murojaat"),
+            KeyboardButton(text="📞 Bog'lanish")
         ],
         [
             KeyboardButton(text="📊 OSS Portal", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
             KeyboardButton(text="🗺 GeoWFM Xarita", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geoutr/equipments/filter"))
         ],
         [
-            KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/")),
-            KeyboardButton(text="📞 Bog'lanish")
+            KeyboardButton(text="📱 MSMS Portal", web_app=WebAppInfo(url="https://msms.uztelecom.uz/"))
         ]
     ],
     resize_keyboard=True
@@ -132,7 +181,7 @@ async def command_start_handler(message: Message) -> None:
 async def stats_handler(message: Message) -> None:
     if message.from_user.id != ADMIN_ID:
         return
-    await message.answer(f"📊 Parolni kiritib ulangan xodimlar: {len(authorized_users)} ta\n📦 Bazadagi splitter va uskunalar: {len(splitters_list)} ta")
+    await message.answer(f"📊 Parolni kiritib ulangan xodimlar: {len(authorized_users)} ta\n📦 Splitterlar: {len(splitters_list)} ta\n👥 Abonentlar: {len(subscribers_list)} ta")
 
 @dp.message()
 async def text_handler(message: Message) -> None:
@@ -140,6 +189,7 @@ async def text_handler(message: Message) -> None:
     text = message.text.strip()
 
     if user_id == ADMIN_ID or user_id in authorized_users:
+        # Splitter qidirish holati
         if user_id in search_state:
             search_state.remove(user_id)
             query = text.lower()
@@ -162,20 +212,52 @@ async def text_handler(message: Message) -> None:
                     found.append(s)
 
             if not found:
-                await message.answer("❌ Bunday splitter yoki manzil topilmadi. Qaytadan qidirish uchun '⚡ Splitter qidirish' tugmasini bosing.")
+                await message.answer("❌ Bunday splitter yoki manzil topilmadi.")
             else:
-                response = f"🔍 <b>Qidiruv natijalari (Jami topildi: {len(found)} ta):</b>\n\n"
+                response = f"🔍 <b>Splitter qidiruv natijalari (Jami: {len(found)} ta):</b>\n\n"
                 for item in found[:10]:
                     response += (
                         f"📍 <b>Hudud:</b> {item['town']}\n"
                         f"🏷 <b>Nomi:</b> {item['number']}\n"
                         f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"🔢 <b>Seriya raqami:</b> {item['real_sn']}\n"
+                        f"🔢 <b>S/N:</b> {item['real_sn']}\n"
                         f"-----------------------------------\n"
                     )
                 if len(found) > 10:
-                    response += f"\n<i>Natijalar ko'p ({len(found)} ta), faqat dastlabki 10 tasi ko'rsatildi. Aniqroq kiriting.</i>"
+                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
+                await message.answer(response, parse_mode=ParseMode.HTML)
+            return
+
+        # Abonent qidirish holati
+        if user_id in subscriber_search_state:
+            subscriber_search_state.remove(user_id)
+            query = text.lower()
+            
+            found_subs = []
+            for sub in subscribers_list:
+                log = sub['login'].lower()
+                cli = sub['client'].lower()
+                ph = sub['phone'].lower()
+                if query in log or query in cli or query in ph:
+                    found_subs.append(sub)
+
+            if not found_subs:
+                await message.answer("❌ Bunday login yoki abonent topilmadi. Qaytadan '🔍 Abonent qidirish' tugmasini bosing.")
+            else:
+                response = f"👤 <b>Abonent qidiruv natijalari (Jami: {len(found_subs)} ta):</b>\n\n"
+                for item in found_subs[:10]:
+                    response += (
+                        f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
+                        f"🔑 <b>Login / Schot:</b> <code>{item['login']}</code>\n"
+                        f"📞 <b>Tel:</b> {item['phone']}\n"
+                        f"📦 <b>Tarif:</b> {item['rate']}\n"
+                        f"🏠 <b>Manzil:</b> {item['address']}\n"
+                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
+                        f"-----------------------------------\n"
+                    )
+                if len(found_subs) > 10:
+                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
                 await message.answer(response, parse_mode=ParseMode.HTML)
             return
 
@@ -191,7 +273,10 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Splitter qidirish":
             search_state.add(user_id)
-            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini va raqamni kiriting (masalan: <code>Тома</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
+        elif text == "🔍 Abonent qidirish":
+            subscriber_search_state.add(user_id)
+            await message.answer("🔍 Abonent loginini yoki schot raqamini kiriting (masalan: <code>m363744</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -241,11 +326,11 @@ async def callback_handler(callback: CallbackQuery) -> None:
                 f"🏷 <b>Nomi:</b> {item['number']}\n"
                 f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
                 f"🏠 <b>Manzil:</b> {item['address']}\n"
-                f"🔢 <b>Seriya raqami:</b> {item['real_sn']}\n"
+                f"🔢 <b>S/N:</b> {item['real_sn']}\n"
                 f"-----------------------------------\n"
             )
         if len(found) > 10:
-            response += f"\n<i>Natijalar ko'p ({len(found)} ta), faqat dastlabki 10 tasi ko'rsatildi. Aniqroq qidirish uchun '⚡ Splitter qidirish' dan foydalaning.</i>"
+            response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
         await callback.message.answer(response, parse_mode=ParseMode.HTML)
     elif data_id.startswith("uch_"):
         data = UCHASKA_10_DATA.get(data_id)
