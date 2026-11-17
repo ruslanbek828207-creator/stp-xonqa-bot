@@ -25,7 +25,6 @@ ADMIN_ID = 51975910
 SECRET_PASSWORD = "3939"
 
 authorized_users = set()
-search_state = set()
 
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
@@ -131,25 +130,22 @@ keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="🌐 Интернет тарифлари"),
-            KeyboardButton(text="⚡ Сплиттер қидириш")
+            KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
         ],
         [
-            KeyboardButton(text="🔍 Абонент қидириш"),
-            KeyboardButton(text="🏘 Қишлоқ ва шаҳарчалар")
+            KeyboardButton(text="🏘 Қишлоқ ва шаҳарчалар"),
+            KeyboardButton(text="🏢 10-учаска объектлари")
         ],
         [
-            KeyboardButton(text="🏢 10-учаска объектлари"),
-            KeyboardButton(text="👷 Электрамонтёрлар")
+            KeyboardButton(text="👷 Электрамонтёрлар"),
+            KeyboardButton(text="🛠 Хизматлар ва мурожаат")
         ],
         [
-            KeyboardButton(text="🛠 Хизматлар ва мурожаат"),
-            KeyboardButton(text="📞 Боғланиш")
+            KeyboardButton(text="📞 Боғланиш"),
+            KeyboardButton(text="📊 OSS Портал", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/"))
         ],
         [
-            KeyboardButton(text="📊 OSS Портал", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/")),
-            KeyboardButton(text="🗺 GeoWFM Харита", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geoutr/equipments/filter"))
-        ],
-        [
+            KeyboardButton(text="🗺 GeoWFM Харита", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geoutr/equipments/filter")),
             KeyboardButton(text="📱 MSMS Портал", web_app=WebAppInfo(url="https://msms.uztelecom.uz/"))
         ]
     ],
@@ -190,11 +186,8 @@ async def text_handler(message: Message) -> None:
                 "📞 Масъул: +998995603937",
                 parse_mode=ParseMode.HTML
             )
-        elif text == "⚡ Сплиттер қидириш":
-            search_state.add(user_id)
-            await message.answer("🔍 Қидирмоқчи бўлган сплиттер номини ёки рақамини киритинг (масалан: <code>Markaz 1/1/1</code> ёки <code>1/1/1</code>):", parse_mode=ParseMode.HTML)
-        elif text == "🔍 Абонент қидириш":
-            await message.answer("🔍 Абонент Логин (счёт), Ф.И.Ш., телефон рақами ёки манзилини ёзинг (масалан: <code>m897730</code>):", parse_mode=ParseMode.HTML)
+        elif text == "🔍 Абонент ва сплиттер қидириш":
+            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами ёки сплиттер номини киритинг (масалан: <code>m897730</code> ёки <code>Markaz 1/1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Қишлоқ ва шаҳарчалар":
             buttons = []
             row = []
@@ -218,42 +211,10 @@ async def text_handler(message: Message) -> None:
         elif text == "📞 Боғланиш":
             await message.answer("📞 <b>Алоқа:</b> +998995603937 (Хонқа тумани)")
         else:
-            # Сплиттер қидириш
-            if user_id in search_state:
-                search_state.remove(user_id)
-                query = text.lower().strip()
-                keywords = query.split() # Сўровдаги барча сўзларни ажратиб оламиз (масалан: ['markaz', '1/1/1'])
-                
-                found = []
-                for s in splitters_list:
-                    # Барча майдонларни бирлаштириб битта матн ҳосил қиламиз
-                    combined_text = f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
-                    
-                    # Кiritilgan barcha so'zlar sплиттер маълумотларида мавжудлигини текширамиз
-                    match_all = all(kw in combined_text for kw in keywords)
-                    if match_all:
-                        found.append(s)
-
-                if not found:
-                    await message.answer("❌ Бундай сплиттер ёки манзил топилмади.")
-                else:
-                    response = f"🔍 <b>Сплиттер қидирув натижалари (Жами: {len(found)} та):</b>\n\n"
-                    for item in found[:10]:
-                        response += (
-                            f"📍 <b>Ҳудуд:</b> {item['town']}\n"
-                            f"🏷 <b>Номи:</b> {item['number']}\n"
-                            f"⚙️ <b>Тури:</b> {item['splitter']} ({item['model']})\n"
-                            f"🏠 <b>Манзил:</b> {item['address']}\n"
-                            f"🔢 <b>S/N:</b> {item['real_sn']}\n"
-                            f"-----------------------------------\n"
-                        )
-                    if len(found) > 10:
-                        response += f"\n<i>Фақат дастлабки 10 таси кўрсатилди.</i>"
-                    await message.answer(response, parse_mode=ParseMode.HTML)
-                return
-
-            # Абонентни қидириш
             query = text.lower().strip()
+            keywords = query.split()
+
+            # 1. Абонентларни қидириш
             found_subs = []
             for sub in subscribers_list:
                 log = sub['login'].lower()
@@ -264,21 +225,43 @@ async def text_handler(message: Message) -> None:
                 if query in log or query in cli or query in ph or query in msisdn or query in adr:
                     found_subs.append(sub)
 
-            if found_subs:
-                response = f"👤 <b>Абонент қидирув натижалари (Жами: {len(found_subs)} та):</b>\n\n"
-                for item in found_subs[:10]:
-                    response += (
-                        f"👨‍💼 <b>Ф.И.Ш:</b> {item['client']}\n"
-                        f"🔑 <b>Логин:</b> <code>{item['login']}</code>\n"
-                        f"📞 <b>Тел:</b> {item['phone']}\n"
-                        f"📋 <b>Тариф:</b> {item['rate_plan']}\n"
-                        f"🏠 <b>Манзил:</b> {item['address']}\n"
-                        f"🟢 <b>Ҳолати:</b> {item['status']}\n"
-                        f"💰 <b>Баланс:</b> {item['balance']} сўм\n"
-                        f"-----------------------------------\n"
-                    )
-                if len(found_subs) > 10:
-                    response += f"\n<i>Фақат дастлабки 10 таси кўрсатилди. Аниқроқ ёзинг.</i>"
+            # 2. Сплиттерларни қидириш
+            found_splitters = []
+            for s in splitters_list:
+                combined_text = f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
+                if all(kw in combined_text for kw in keywords):
+                    found_splitters.append(s)
+
+            # Натижаларни чиқариш
+            if found_subs or found_splitters:
+                response = ""
+                
+                if found_subs:
+                    response += f"👤 <b>Абонентлар (Жами: {len(found_subs)} та):</b>\n\n"
+                    for item in found_subs[:5]:
+                        response += (
+                            f"👨‍💼 <b>Ф.И.Ш:</b> {item['client']}\n"
+                            f"🔑 <b>Логин:</b> <code>{item['login']}</code>\n"
+                            f"📞 <b>Тел:</b> {item['phone']}\n"
+                            f"📋 <b>Тариф:</b> {item['rate_plan']}\n"
+                            f"🏠 <b>Манзил:</b> {item['address']}\n"
+                            f"🟢 <b>Ҳолати:</b> {item['status']}\n"
+                            f"💰 <b>Баланс:</b> {item['balance']} сўм\n"
+                            f"-----------------------------------\n"
+                        )
+                
+                if found_splitters:
+                    response += f"⚡ <b>Сплиттерлар (Жами: {len(found_splitters)} та):</b>\n\n"
+                    for item in found_splitters[:5]:
+                        response += (
+                            f"📍 <b>Ҳудуд:</b> {item['town']}\n"
+                            f"🏷 <b>Номи:</b> {item['number']}\n"
+                            f"⚙️ <b>Тури:</b> {item['splitter']} ({item['model']})\n"
+                            f"🏠 <b>Манзил:</b> {item['address']}\n"
+                            f"🔢 <b>S/N:</b> {item['real_sn']}\n"
+                            f"-----------------------------------\n"
+                        )
+                
                 await message.answer(response, parse_mode=ParseMode.HTML)
             else:
                 await message.answer("❌ Бундай абонент ёки сплиттер топилмади. Қайтадан текшириб ёзинг.")
