@@ -33,6 +33,7 @@ EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 splitters_list = []
 subscribers_list = []
 
+# Splitterlar bazasini o'qish
 try:
     if os.path.exists(EXCEL_SPLITTERS):
         df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
@@ -53,19 +54,32 @@ try:
 except Exception as e:
     print(f"❌ Splitter faylini o'qishda xatolik: {e}")
 
+# Abonentlar bazasini o'qish (Barcha varaqlarni / Sheetlarni qo'llab-quvvatlash uchun)
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
-        df_sub = pd.read_excel(EXCEL_SUBSCRIBERS)
-        for _, row in df_sub.iterrows():
-            log_val = str(row.get('Login', ''))
-            if log_val and log_val != 'nan':
-                subscribers_list.append({
-                    "client": str(row.get('CLIENT', '')),
-                    "login": log_val,
-                    "phone": str(row.get('PHONE', '')),
-                    "address": str(row.get('Прописка', '')),
-                    "balance": str(row.get('Баланс', ''))
-                })
+        xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
+        for sheet_name in xls.sheet_names:
+            df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name=sheet_name)
+            for _, row in df_sub.iterrows():
+                # MSISDN, Login, Telefon yoki Client ustunlaridan ma'lumotlarni xavfsiz olish
+                client_name = str(row.get('CLIENT', '') or row.get('Client', '') or 'Nomaʼlum')
+                phone_num = str(row.get('PHONE', '') or row.get('Phone', '') or '-')
+                msisdn_val = str(row.get('MSISDN', '') or '')
+                address_val = str(row.get('Прописка', '') or row.get('Address', '') or '-')
+                balance_val = str(row.get('Баланс', '') or row.get('Balance', '0'))
+                rate_plan = str(row.get('RATE_PLAN', '') or '-')
+                status_val = str(row.get('RT_LC_STATES', '') or '-')
+
+                if client_name and client_name != 'nan':
+                    subscribers_list.append({
+                        "client": client_name,
+                        "phone": phone_num,
+                        "msisdn": msisdn_val,
+                        "address": address_val,
+                        "balance": balance_val,
+                        "rate_plan": rate_plan,
+                        "status": status_val
+                    })
         print(f"✅ Abonentlar bazasi yuklandi: {len(subscribers_list)} ta")
 except Exception as e:
     print(f"❌ Abonentlar faylini o'qishda xatolik: {e}")
@@ -163,10 +177,10 @@ async def text_handler(message: Message) -> None:
         if text == "🌐 Internet tariflari":
             await message.answer(
                 "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
-                "🔥 <b>Hammasi birga 4</b> (500 Mbit/s) - 500 000 so'm/oy\n"
-                "🔥 <b>Hammasi birga 3+</b> (350 Mbit/s) - 350 000 so'm/oy\n"
-                "🔥 <b>Hammasi birga 3</b> (250 Mbit/s) - 215 000 so'm/oy\n"
-                "🔥 <b>Hammasi birga 2+</b> (150 Mbit/s) - 175 000 so'm/oy\n\n"
+                "🔥 <b>Hammasi birga 4</b> (500 Mbit/s) - 500 000 so'м/oy\n"
+                "🔥 <b>Hammasi birga 3+</b> (350 Mbit/s) - 350 000 so'м/oy\n"
+                "🔥 <b>Hammasi birga 3</b> (250 Mbit/s) - 215 000 so'м/oy\n"
+                "🔥 <b>Hammasi birga 2+</b> (150 Mbit/s) - 175 000 so'м/oy\n\n"
                 "📞 Mas'ul: +998995603937",
                 parse_mode=ParseMode.HTML
             )
@@ -174,7 +188,8 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            await message.answer("🔍 Abonent F.I.Sh., login yoki manzilini yozing (masalan: <code>Djobborov</code> yoki <code>m235795</code>):", parse_mode=ParseMode.HTML)
+            # Abonent qidirish rejimi yoki to'g'ridan-to'g'ri qidiruvni boshlash
+            await message.answer("🔍 Abonent F.I.Sh., telefon raqami, MSISDN yoki manzilini yozing (masalan: <code>Sarvar</code> yoki <code>995443008</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -238,15 +253,15 @@ async def text_handler(message: Message) -> None:
                     await message.answer(response, parse_mode=ParseMode.HTML)
                 return
 
-            # Abonentni F.I.Sh, Login, Telefon yoki Manzil bo'yicha qidirish
+            # Abonentni F.I.Sh, Telefon, MSISDN yoki Manzil bo'yicha qidirish
             query = text.lower().strip()
             found_subs = []
             for sub in subscribers_list:
-                log = sub['login'].lower()
                 cli = sub['client'].lower()
                 ph = sub['phone'].lower()
+                msisdn = sub['msisdn'].lower()
                 adr = sub['address'].lower()
-                if query in log or query in cli or query in ph or query in adr:
+                if query in cli or query in ph or query in msisdn or query in adr:
                     found_subs.append(sub)
 
             if found_subs:
@@ -254,10 +269,12 @@ async def text_handler(message: Message) -> None:
                 for item in found_subs[:10]:
                     response += (
                         f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
-                        f"🔑 <b>Login / Schot:</b> <code>{item['login']}</code>\n"
                         f"📞 <b>Tel:</b> {item['phone']}\n"
+                        f"🆔 <b>MSISDN:</b> <code>{item['msisdn']}</code>\n"
+                        f"📋 <b>Tarif:</b> {item['rate_plan']}\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
+                        f"🟢 <b>Holati:</b> {item['status']}\n"
+                        f"💰 <b>Balans:</b> {item['balance']} so'м\n"
                         f"-----------------------------------\n"
                     )
                 if len(found_subs) > 10:
