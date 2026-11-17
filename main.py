@@ -57,43 +57,18 @@ except Exception as e:
 
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
-        xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
-        for sheet in xls.sheet_names:
-            df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name=sheet)
-            # Xonqa bo'yicha filter yoki umumiy o'qish
-            for _, row in df_sub.iterrows():
-                # Ustun nomlarini moslashtirish
-                client_name = str(row.get('CLIENT', row.get(3, '')))
-                login = str(row.get('MSISDN', row.get(5, '')))
-                phone = str(row.get('PHONE', row.get(4, '')))
-                rate = str(row.get('RATE_PLAN', row.get(2, '')))
-                addr = str(row.get('Прописка', row.get(8, '')))
-                balance = str(row.get('Баланс', row.get(9, '')))
-                dept = str(row.get('DEPARTMENTS', row.get(1, '')))
-                
-                if 'Ханкинский' in dept or 'Ханкинский' in str(row.values) or sheet != 'Sheet1':
-                    subscribers_list.append({
-                        "client": client_name,
-                        "login": login,
-                        "phone": phone,
-                        "rate": rate,
-                        "address": addr,
-                        "balance": balance
-                    })
-        
-        # Shuningdek Sheet1'dagi Xonqa abonentlarini ham qo'shamiz
-        if 'Sheet1' in xls.sheet_names:
-            df_s1 = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name='Sheet1')
-            xonqa_s1 = df_s1[df_s1['DEPARTMENTS'].astype(str).str.contains('Ханкинский', case=False, na=False)]
-            for _, row in xonqa_s1.iterrows():
-                subscribers_list.append({
-                    "client": str(row.get('CLIENT', '')),
-                    "login": str(row.get('MSISDN', '')),
-                    "phone": str(row.get('PHONE', '')),
-                    "rate": str(row.get('RATE_PLAN', '')),
-                    "address": str(row.get('Прописка', '')),
-                    "balance": str(row.get('Баланс', ''))
-                })
+        df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name='Sheet1')
+        # Faqat Xonqa tumani (Ханкинский РУТ) abonentlarini tanlab olish
+        xonqa_sub = df_sub[df_sub['DEPARTMENTS'].astype(str).str.contains('Ханкинский', case=False, na=False)]
+        for _, row in xonqa_sub.iterrows():
+            subscribers_list.append({
+                "client": str(row.get('CLIENT', '')),
+                "login": str(row.get('MSISDN', '')),
+                "phone": str(row.get('PHONE', '')),
+                "rate": str(row.get('RATE_PLAN', '')),
+                "address": str(row.get('Прописка', '')),
+                "balance": str(row.get('Баланс', ''))
+            })
         print(f"✅ Abonentlar bazasi yuklandi: {len(subscribers_list)} ta")
 except Exception as e:
     print(f"❌ Abonentlar faylini o'qishda xatolik: {e}")
@@ -135,7 +110,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu (Abonent qidirish tugmasi qo'shildi)
+# Asosiy menyu
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -181,7 +156,7 @@ async def command_start_handler(message: Message) -> None:
 async def stats_handler(message: Message) -> None:
     if message.from_user.id != ADMIN_ID:
         return
-    await message.answer(f"📊 Parolni kiritib ulangan xodimlar: {len(authorized_users)} ta\n📦 Splitterlar: {len(splitters_list)} ta\n👥 Abonentlar: {len(subscribers_list)} ta")
+    await message.answer(f"📊 Parolni kiritib ulangan xodimlar: {len(authorized_users)} ta\n📦 Splitterlar: {len(splitters_list)} ta\n👥 Xonqa abonentlari: {len(subscribers_list)} ta")
 
 @dp.message()
 async def text_handler(message: Message) -> None:
@@ -189,7 +164,6 @@ async def text_handler(message: Message) -> None:
     text = message.text.strip()
 
     if user_id == ADMIN_ID or user_id in authorized_users:
-        # Splitter qidirish holati
         if user_id in search_state:
             search_state.remove(user_id)
             query = text.lower()
@@ -229,7 +203,6 @@ async def text_handler(message: Message) -> None:
                 await message.answer(response, parse_mode=ParseMode.HTML)
             return
 
-        # Abonent qidirish holati
         if user_id in subscriber_search_state:
             subscriber_search_state.remove(user_id)
             query = text.lower()
