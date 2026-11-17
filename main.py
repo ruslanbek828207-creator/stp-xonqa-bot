@@ -33,28 +33,34 @@ EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 splitters_list = []
 subscribers_list = []
 
-# Splitterlar bazasini o'qish
+# Splitterlar bazasini o'qish (Yangi yuklangan fayl formati bo'yicha)
 try:
     if os.path.exists(EXCEL_SPLITTERS):
         df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
-        if len(df_raw) > 1:
-            col_names = df_raw.iloc[0].values
-            df_data = df_raw.iloc[1:].copy()
-            df_data.columns = col_names
-            for _, row in df_data.iterrows():
-                splitters_list.append({
-                    "number": str(row.get('Номер оборуд.', '')),
-                    "splitter": str(row.get('Вид оборуд.', '')),
-                    "model": str(row.get('Марка', '')),
-                    "address": str(row.get('Адрес установки', '')),
-                    "town": str(row.get('Населенный пункт', '')),
-                    "real_sn": str(row.get('Серийный номер', ''))
-                })
+        if len(df_raw) > 0:
+            for _, row in df_raw.iterrows():
+                # Ustunlar indekslari bo'yicha xavfsiz o'qish
+                num = str(row.iloc[2] if len(row) > 2 else '')
+                splitter_type = str(row.iloc[5] if len(row) > 5 else '')
+                model = str(row.iloc[6] if len(row) > 6 else '')
+                address = str(row.iloc[25] if len(row) > 25 else '')
+                town = str(row.iloc[31] if len(row) > 31 else '')
+                real_sn = str(row.iloc[35] if len(row) > 35 else '')
+                
+                if num and num != 'nan':
+                    splitters_list.append({
+                        "number": num,
+                        "splitter": splitter_type,
+                        "model": model,
+                        "address": address,
+                        "town": town,
+                        "real_sn": real_sn
+                    })
         print(f"✅ Splitterlar yuklandi: {len(splitters_list)} ta")
 except Exception as e:
     print(f"❌ Splitter faylini o'qishda xatolik: {e}")
 
-# Abonentlar bazasini o'qish (Barcha varaqlarni va Login ustunini to'liq qo'llab-quvvatlash)
+# Abonentlar bazasini o'qish (Xonqa.xlsx barcha varaqlari)
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
@@ -187,7 +193,7 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Splitter qidirish":
             search_state.add(user_id)
-            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Навхос</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
             await message.answer("🔍 Abonent Login (schot), F.I.Sh., telefon raqami yoki manzilini yozing (masalan: <code>m897730</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
