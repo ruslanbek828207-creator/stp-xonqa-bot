@@ -27,8 +27,7 @@ SECRET_PASSWORD = "3939"
 authorized_users = set()
 search_state = set()
 
-# Янги юборилган сплиттерлар ва абонентлар файл номлари
-EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s_2.xlsx"
+EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 
 splitters_list = []
@@ -193,7 +192,7 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Сплиттер қидириш":
             search_state.add(user_id)
-            await message.answer("🔍 Қидирмоқчи бўлган сплиттер номини киритинг (масалан: <code>Markaz 1/1/1</code> ёки <code>Toma 1/1/1</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Қидирмоқчи бўлган сплиттер номини ёки рақамини киритинг (масалан: <code>Markaz 1/1/1</code> ёки <code>1/1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Абонент қидириш":
             await message.answer("🔍 Абонент Логин (счёт), Ф.И.Ш., телефон рақами ёки манзилини ёзинг (масалан: <code>m897730</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Қишлоқ ва шаҳарчалар":
@@ -223,15 +222,16 @@ async def text_handler(message: Message) -> None:
             if user_id in search_state:
                 search_state.remove(user_id)
                 query = text.lower().strip()
+                keywords = query.split() # Сўровдаги барча сўзларни ажратиб оламиз (масалан: ['markaz', '1/1/1'])
                 
                 found = []
                 for s in splitters_list:
-                    num = s['number'].lower().strip()
-                    addr = s['address'].lower().strip()
-                    town = s['town'].lower().strip()
-                    sn = s['real_sn'].lower().strip()
+                    # Барча майдонларни бирлаштириб битта матн ҳосил қиламиз
+                    combined_text = f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
                     
-                    if query in num or query in addr or query in town or query in sn:
+                    # Кiritilgan barcha so'zlar sплиттер маълумотларида мавжудлигини текширамиз
+                    match_all = all(kw in combined_text for kw in keywords)
+                    if match_all:
                         found.append(s)
 
                 if not found:
