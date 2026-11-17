@@ -27,12 +27,24 @@ SECRET_PASSWORD = "3939"
 authorized_users = set()
 search_state = set()
 
-# Excel fayllar
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 
 splitters_list = []
 subscribers_list = []
+
+# Xonqa abonentlarini bevosita kodga ham kiritamiz (zaxira va kafolat uchun)
+DEFAULT_SUBSCRIBERS = [
+    {"client": "MASHARIPOVA AYGUL O‘RINOVNA", "login": "m363744", "phone": "998906493036", "rate": "BIRGA 1", "address": "АХИЛЛИК МФЙ, ЧЕГАРАЧИ КЎЧАСИ, uy:26", "balance": "34912.0"},
+    {"client": "RAJABOVA MINAVAR MATKARIMOVNA", "login": "m401085", "phone": "959270974", "rate": "BIRGA 1", "address": "БАРКАМОЛЛИК МФЙ, АЛ-ХОРАЗМИЙ КЎЧАСИ, uy:9", "balance": "30000.0"},
+    {"client": "SAMANDAROV ABRORBEK SARDOR O‘G‘LI", "login": "m699411", "phone": "884527682", "rate": "BIRGA 2+", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:14", "balance": "0.0"},
+    {"client": "ABDULLAYEVA NARGIZA MURATDJANOVNA", "login": "m699431", "phone": "938009119", "rate": "BIRGA 2", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:2А", "balance": "0.0"},
+    {"client": "MUXAMMEDOV DILMUROD XAMID O‘G‘LI", "login": "m880746", "phone": "507585155", "rate": "BIRGA 3", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:48 А", "balance": "500.0"},
+    {"client": "NIYAZMETOV MUZAFFAR ILXAMBAYEVICH", "login": "m360847", "phone": "998977820169", "rate": "BIRGA 1", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:50", "balance": "5000.0"},
+]
+
+for sub in DEFAULT_SUBSCRIBERS:
+    subscribers_list.append(sub)
 
 try:
     if os.path.exists(EXCEL_SPLITTERS):
@@ -58,14 +70,16 @@ try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         df_sub = pd.read_excel(EXCEL_SUBSCRIBERS)
         for _, row in df_sub.iterrows():
-            subscribers_list.append({
-                "client": str(row.get('CLIENT', '')),
-                "login": str(row.get('MSISDN', '')),
-                "phone": str(row.get('PHONE', '')),
-                "rate": str(row.get('RATE_PLAN', '')),
-                "address": str(row.get('Прописка', '')),
-                "balance": str(row.get('Баланс', ''))
-            })
+            log_val = str(row.get('MSISDN', ''))
+            if log_val and log_val != 'nan':
+                subscribers_list.append({
+                    "client": str(row.get('CLIENT', '')),
+                    "login": log_val,
+                    "phone": str(row.get('PHONE', '')),
+                    "rate": str(row.get('RATE_PLAN', '')),
+                    "address": str(row.get('Прописка', '')),
+                    "balance": str(row.get('Баланс', ''))
+                })
         print(f"✅ Abonentlar bazasi yuklandi: {len(subscribers_list)} ta")
 except Exception as e:
     print(f"❌ Abonentlar faylini o'qishda xatolik: {e}")
@@ -107,7 +121,6 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Xonqa tumani, Olmazor MFY", "task": "Elektr va optik tarmoqlarda profilaktika ishlari."},
 }
 
-# Asosiy menyu
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -199,7 +212,6 @@ async def text_handler(message: Message) -> None:
         elif text == "📞 Bog'lanish":
             await message.answer("📞 <b>Aloqa:</b> +998995603937 (Xonqa tumani)")
         else:
-            # 1. Splitter qidirish holati
             if user_id in search_state:
                 search_state.remove(user_id)
                 query = text.lower()
@@ -239,14 +251,13 @@ async def text_handler(message: Message) -> None:
                     await message.answer(response, parse_mode=ParseMode.HTML)
                 return
 
-            # 2. Abonent qidirish (Login, F.I.Sh yoki Telefon raqami bo'yicha)
-            query = text.lower()
+            query = text.lower().strip()
             found_subs = []
             for sub in subscribers_list:
                 log = sub['login'].lower()
                 cli = sub['client'].lower()
                 ph = sub['phone'].lower()
-                if query in log or query in cli or query in ph:
+                if query in log or query in cli or query in ph or log in query:
                     found_subs.append(sub)
 
             if found_subs:
@@ -258,7 +269,7 @@ async def text_handler(message: Message) -> None:
                         f"📞 <b>Tel:</b> {item['phone']}\n"
                         f"📦 <b>Tarif:</b> {item['rate']}\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"💰 <b>Balans:</b> {item['balance']} so'м\n"
+                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
                         f"-----------------------------------\n"
                     )
                 if len(found_subs) > 10:
