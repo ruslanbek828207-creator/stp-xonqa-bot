@@ -33,19 +33,6 @@ EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 splitters_list = []
 subscribers_list = []
 
-# Xonqa abonentlarini bevosita kodga ham kiritamiz (zaxira va kafolat uchun)
-DEFAULT_SUBSCRIBERS = [
-    {"client": "MASHARIPOVA AYGUL O‘RINOVNA", "login": "m363744", "phone": "998906493036", "rate": "BIRGA 1", "address": "АХИЛЛИК МФЙ, ЧЕГАРАЧИ КЎЧАСИ, uy:26", "balance": "34912.0"},
-    {"client": "RAJABOVA MINAVAR MATKARIMOVNA", "login": "m401085", "phone": "959270974", "rate": "BIRGA 1", "address": "БАРКАМОЛЛИК МФЙ, АЛ-ХОРАЗМИЙ КЎЧАСИ, uy:9", "balance": "30000.0"},
-    {"client": "SAMANDAROV ABRORBEK SARDOR O‘G‘LI", "login": "m699411", "phone": "884527682", "rate": "BIRGA 2+", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:14", "balance": "0.0"},
-    {"client": "ABDULLAYEVA NARGIZA MURATDJANOVNA", "login": "m699431", "phone": "938009119", "rate": "BIRGA 2", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:2А", "balance": "0.0"},
-    {"client": "MUXAMMEDOV DILMUROD XAMID O‘G‘LI", "login": "m880746", "phone": "507585155", "rate": "BIRGA 3", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:48 А", "balance": "500.0"},
-    {"client": "NIYAZMETOV MUZAFFAR ILXAMBAYEVICH", "login": "m360847", "phone": "998977820169", "rate": "BIRGA 1", "address": "АХИЛЛИК МФЙ, АФСОНА КЎЧАСИ, uy:50", "balance": "5000.0"},
-]
-
-for sub in DEFAULT_SUBSCRIBERS:
-    subscribers_list.append(sub)
-
 try:
     if os.path.exists(EXCEL_SPLITTERS):
         df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
@@ -70,13 +57,13 @@ try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         df_sub = pd.read_excel(EXCEL_SUBSCRIBERS)
         for _, row in df_sub.iterrows():
-            log_val = str(row.get('MSISDN', ''))
+            log_val = str(row.get('Login', row.get('MSISDN', '')))
             if log_val and log_val != 'nan':
                 subscribers_list.append({
                     "client": str(row.get('CLIENT', '')),
                     "login": log_val,
                     "phone": str(row.get('PHONE', '')),
-                    "rate": str(row.get('RATE_PLAN', '')),
+                    "rate": str(row.get('Tarif', row.get('RATE_PLAN', ''))),
                     "address": str(row.get('Прописка', '')),
                     "balance": str(row.get('Баланс', ''))
                 })
@@ -188,7 +175,7 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>m401085</code> yoki <code>m363744</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>b00004943794</code> yoki <code>m401085</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
