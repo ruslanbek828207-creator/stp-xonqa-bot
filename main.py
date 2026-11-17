@@ -39,13 +39,12 @@ try:
         df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
         if len(df_raw) > 0:
             for _, row in df_raw.iterrows():
-                # Ustunlar indekslari bo'yicha xavfsiz o'qish
-                num = str(row.iloc[2] if len(row) > 2 else '')
-                splitter_type = str(row.iloc[5] if len(row) > 5 else '')
-                model = str(row.iloc[6] if len(row) > 6 else '')
-                address = str(row.iloc[25] if len(row) > 25 else '')
-                town = str(row.iloc[31] if len(row) > 31 else '')
-                real_sn = str(row.iloc[35] if len(row) > 35 else '')
+                num = str(row.iloc[2] if len(row) > 2 else '').strip()
+                splitter_type = str(row.iloc[5] if len(row) > 5 else '').strip()
+                model = str(row.iloc[6] if len(row) > 6 else '').strip()
+                address = str(row.iloc[25] if len(row) > 25 else '').strip()
+                town = str(row.iloc[31] if len(row) > 31 else '').strip()
+                real_sn = str(row.iloc[35] if len(row) > 35 else '').strip()
                 
                 if num and num != 'nan':
                     splitters_list.append({
@@ -67,14 +66,14 @@ try:
         for sheet_name in xls.sheet_names:
             df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name=sheet_name)
             for _, row in df_sub.iterrows():
-                client_name = str(row.get('CLIENT', '') or row.get('Client', '') or '')
-                login_val = str(row.get('Login', '') or row.get('login', '') or '')
-                phone_num = str(row.get('PHONE', '') or row.get('Phone', '') or '-')
-                msisdn_val = str(row.get('MSISDN', '') or '')
-                address_val = str(row.get('Прописка', '') or row.get('Address', '') or '-')
-                balance_val = str(row.get('Баланс', '') or row.get('Balance', '0'))
-                rate_plan = str(row.get('RATE_PLAN', '') or '-')
-                status_val = str(row.get('RT_LC_STATES', '') or '-')
+                client_name = str(row.get('CLIENT', '') or row.get('Client', '') or '').strip()
+                login_val = str(row.get('Login', '') or row.get('login', '') or '').strip()
+                phone_num = str(row.get('PHONE', '') or row.get('Phone', '') or '-').strip()
+                msisdn_val = str(row.get('MSISDN', '') or '').strip()
+                address_val = str(row.get('Прописка', '') or row.get('Address', '') or '-').strip()
+                balance_val = str(row.get('Баланс', '') or row.get('Balance', '0')).strip()
+                rate_plan = str(row.get('RATE_PLAN', '') or '-').strip()
+                status_val = str(row.get('RT_LC_STATES', '') or '-').strip()
 
                 if (client_name and client_name != 'nan') or (login_val and login_val != 'nan'):
                     subscribers_list.append({
@@ -193,7 +192,7 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "⚡ Splitter qidirish":
             search_state.add(user_id)
-            await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Навхос</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Qidirmoqchi bo'lgan splitter nomini kiriting (masalan: <code>Markaz 1/1/1</code> yoki <code>Toma 1/1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
             await message.answer("🔍 Abonent Login (schot), F.I.Sh., telefon raqami yoki manzilini yozing (masalan: <code>m897730</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
@@ -222,23 +221,17 @@ async def text_handler(message: Message) -> None:
             # Agar foydalanuvchi "⚡ Splitter qidirish" rejimida bo'lsa
             if user_id in search_state:
                 search_state.remove(user_id)
-                query = text.lower()
-                keywords = [k.strip() for k in query.split(',')]
+                query = text.lower().strip()
                 
                 found = []
                 for s in splitters_list:
-                    num = s['number'].lower()
-                    splitter_info = s['splitter'].lower()
-                    addr = s['address'].lower()
-                    town = s['town'].lower()
-                    sn = s['real_sn'].lower()
+                    num = s['number'].lower().strip()
+                    addr = s['address'].lower().strip()
+                    town = s['town'].lower().strip()
+                    sn = s['real_sn'].lower().strip()
                     
-                    match_any = True
-                    for kw in keywords:
-                        if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
-                            match_any = False
-                            break
-                    if match_any:
+                    # Aniq mos kelishini tekshirish (masalan, kiritilgan nom yoki raqam ichida aniq bo'lishi)
+                    if query in num or query in addr or query in town or query in sn:
                         found.append(s)
 
                 if not found:
