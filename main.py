@@ -26,7 +26,6 @@ SECRET_PASSWORD = "3939"
 
 authorized_users = set()
 search_state = set()
-subscriber_search_state = set()
 
 # Excel fayllardan ma'lumotlarni yuklash
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
@@ -58,7 +57,6 @@ except Exception as e:
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name='Sheet1')
-        # Faqat Xonqa tumani (Ханкинский РУТ) abonentlarini tanlab olish
         xonqa_sub = df_sub[df_sub['DEPARTMENTS'].astype(str).str.contains('Ханкинский', case=False, na=False)]
         for _, row in xonqa_sub.iterrows():
             subscribers_list.append({
@@ -164,76 +162,6 @@ async def text_handler(message: Message) -> None:
     text = message.text.strip()
 
     if user_id == ADMIN_ID or user_id in authorized_users:
-        if user_id in search_state:
-            search_state.remove(user_id)
-            query = text.lower()
-            keywords = [k.strip() for k in query.split(',')]
-            
-            found = []
-            for s in splitters_list:
-                num = s['number'].lower()
-                splitter_info = s['splitter'].lower()
-                addr = s['address'].lower()
-                town = s['town'].lower()
-                sn = s['real_sn'].lower()
-                
-                match_any = True
-                for kw in keywords:
-                    if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
-                        match_any = False
-                        break
-                if match_any:
-                    found.append(s)
-
-            if not found:
-                await message.answer("❌ Bunday splitter yoki manzil topilmadi.")
-            else:
-                response = f"🔍 <b>Splitter qidiruv natijalari (Jami: {len(found)} ta):</b>\n\n"
-                for item in found[:10]:
-                    response += (
-                        f"📍 <b>Hudud:</b> {item['town']}\n"
-                        f"🏷 <b>Nomi:</b> {item['number']}\n"
-                        f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
-                        f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"🔢 <b>S/N:</b> {item['real_sn']}\n"
-                        f"-----------------------------------\n"
-                    )
-                if len(found) > 10:
-                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
-                await message.answer(response, parse_mode=ParseMode.HTML)
-            return
-
-        if user_id in subscriber_search_state:
-            subscriber_search_state.remove(user_id)
-            query = text.lower()
-            
-            found_subs = []
-            for sub in subscribers_list:
-                log = sub['login'].lower()
-                cli = sub['client'].lower()
-                ph = sub['phone'].lower()
-                if query in log or query in cli or query in ph:
-                    found_subs.append(sub)
-
-            if not found_subs:
-                await message.answer("❌ Bunday login yoki abonent topilmadi. Qaytadan '🔍 Abonent qidirish' tugmasini bosing.")
-            else:
-                response = f"👤 <b>Abonent qidiruv natijalari (Jami: {len(found_subs)} ta):</b>\n\n"
-                for item in found_subs[:10]:
-                    response += (
-                        f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
-                        f"🔑 <b>Login / Schot:</b> <code>{item['login']}</code>\n"
-                        f"📞 <b>Tel:</b> {item['phone']}\n"
-                        f"📦 <b>Tarif:</b> {item['rate']}\n"
-                        f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
-                        f"-----------------------------------\n"
-                    )
-                if len(found_subs) > 10:
-                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
-                await message.answer(response, parse_mode=ParseMode.HTML)
-            return
-
         if text == "🌐 Internet tariflari":
             await message.answer(
                 "<b>UZTELECOM Home Internet tariflari (Hammasi birga):</b>\n\n"
@@ -248,8 +176,7 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            subscriber_search_state.add(user_id)
-            await message.answer("🔍 Abonent loginini yoki schot raqamini kiriting (masalan: <code>m363744</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>m363744</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -273,7 +200,73 @@ async def text_handler(message: Message) -> None:
         elif text == "📞 Bog'lanish":
             await message.answer("📞 <b>Aloqa:</b> +998995603937 (Xonqa tumani)")
         else:
-            await message.answer("Tushunarsiz buyruq. Menyudagi tugmalardan foydalaning.")
+            # Agar foydalanuvchi splitter qidirish rejimida bo'lsa
+            if user_id in search_state:
+                search_state.remove(user_id)
+                query = text.lower()
+                keywords = [k.strip() for k in query.split(',')]
+                
+                found = []
+                for s in splitters_list:
+                    num = s['number'].lower()
+                    splitter_info = s['splitter'].lower()
+                    addr = s['address'].lower()
+                    town = s['town'].lower()
+                    sn = s['real_sn'].lower()
+                    
+                    match_any = True
+                    for kw in keywords:
+                        if not (kw in num or kw in splitter_info or kw in addr or kw in town or kw in sn):
+                            match_any = False
+                            break
+                    if match_any:
+                        found.append(s)
+
+                if not found:
+                    await message.answer("❌ Bunday splitter yoki manzil topilmadi.")
+                else:
+                    response = f"🔍 <b>Splitter qidiruv natijalari (Jami: {len(found)} ta):</b>\n\n"
+                    for item in found[:10]:
+                        response += (
+                            f"📍 <b>Hudud:</b> {item['town']}\n"
+                            f"🏷 <b>Nomi:</b> {item['number']}\n"
+                            f"⚙️ <b>Turi:</b> {item['splitter']} ({item['model']})\n"
+                            f"🏠 <b>Manzil:</b> {item['address']}\n"
+                            f"🔢 <b>S/N:</b> {item['real_sn']}\n"
+                            f"-----------------------------------\n"
+                        )
+                    if len(found) > 10:
+                        response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
+                    await message.answer(response, parse_mode=ParseMode.HTML)
+                return
+
+            # Aks holda, kiritilgan matnni ABONENT login/schot yoki telefoni bo'yicha qidirish (to'g'ridan-to'g'ri)
+            query = text.lower()
+            found_subs = []
+            for sub in subscribers_list:
+                log = sub['login'].lower()
+                cli = sub['client'].lower()
+                ph = sub['phone'].lower()
+                if query in log or query in cli or query in ph:
+                    found_subs.append(sub)
+
+            if found_subs:
+                response = f"👤 <b>Abonent qidiruv natijalari (Jami: {len(found_subs)} ta):</b>\n\n"
+                for item in found_subs[:10]:
+                    response += (
+                        f"👨‍💼 <b>F.I.Sh:</b> {item['client']}\n"
+                        f"🔑 <b>Login / Schot:</b> <code>{item['login']}</code>\n"
+                        f"📞 <b>Tel:</b> {item['phone']}\n"
+                        f"📦 <b>Tarif:</b> {item['rate']}\n"
+                        f"🏠 <b>Manzil:</b> {item['address']}\n"
+                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
+                        f"-----------------------------------\n"
+                    )
+                if len(found_subs) > 10:
+                    response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
+                await message.answer(response, parse_mode=ParseMode.HTML)
+            else:
+                await message.answer("❌ Tushunarsiz buyruq yoki bunday abonent/splitter topilmadi. Menyudagi tugmalardan foydalaning yoki to'g'ri login yozing.")
     else:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
