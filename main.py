@@ -27,9 +27,9 @@ SECRET_PASSWORD = "3939"
 authorized_users = set()
 search_state = set()
 
-# Excel fayllardan ma'lumotlarni yuklash
+# Excel fayllar
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
-EXCEL_SUBSCRIBERS = "62cef759-c553-4f4b-950c-b0ce38ffa2d3.xlsx"
+EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 
 splitters_list = []
 subscribers_list = []
@@ -56,9 +56,8 @@ except Exception as e:
 
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
-        df_sub = pd.read_excel(EXCEL_SUBSCRIBERS, sheet_name='Sheet1')
-        xonqa_sub = df_sub[df_sub['DEPARTMENTS'].astype(str).str.contains('Ханкинский', case=False, na=False)]
-        for _, row in xonqa_sub.iterrows():
+        df_sub = pd.read_excel(EXCEL_SUBSCRIBERS)
+        for _, row in df_sub.iterrows():
             subscribers_list.append({
                 "client": str(row.get('CLIENT', '')),
                 "login": str(row.get('MSISDN', '')),
@@ -176,7 +175,7 @@ async def text_handler(message: Message) -> None:
             search_state.add(user_id)
             await message.answer("🔍 Qidirmoqchi bo'lgan qishloq nomini yoki raqamni kiriting (masalan: <code>Олажа</code> yoki <code>1/1</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔍 Abonent qidirish":
-            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>m363744</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Abonent loginini yoki schot raqamini yozing (masalan: <code>m401085</code> yoki <code>m363744</code>):", parse_mode=ParseMode.HTML)
         elif text == "🏘 Qishloq va shaharchalar":
             buttons = []
             row = []
@@ -200,7 +199,7 @@ async def text_handler(message: Message) -> None:
         elif text == "📞 Bog'lanish":
             await message.answer("📞 <b>Aloqa:</b> +998995603937 (Xonqa tumani)")
         else:
-            # Agar foydalanuvchi splitter qidirish rejimida bo'lsa
+            # 1. Splitter qidirish holati
             if user_id in search_state:
                 search_state.remove(user_id)
                 query = text.lower()
@@ -240,7 +239,7 @@ async def text_handler(message: Message) -> None:
                     await message.answer(response, parse_mode=ParseMode.HTML)
                 return
 
-            # Aks holda, kiritilgan matnni ABONENT login/schot yoki telefoni bo'yicha qidirish (to'g'ridan-to'g'ri)
+            # 2. Abonent qidirish (Login, F.I.Sh yoki Telefon raqami bo'yicha)
             query = text.lower()
             found_subs = []
             for sub in subscribers_list:
@@ -259,14 +258,14 @@ async def text_handler(message: Message) -> None:
                         f"📞 <b>Tel:</b> {item['phone']}\n"
                         f"📦 <b>Tarif:</b> {item['rate']}\n"
                         f"🏠 <b>Manzil:</b> {item['address']}\n"
-                        f"💰 <b>Balans:</b> {item['balance']} so'm\n"
+                        f"💰 <b>Balans:</b> {item['balance']} so'м\n"
                         f"-----------------------------------\n"
                     )
                 if len(found_subs) > 10:
                     response += f"\n<i>Faqat dastlabki 10 tasi ko'rsatildi.</i>"
                 await message.answer(response, parse_mode=ParseMode.HTML)
             else:
-                await message.answer("❌ Tushunarsiz buyruq yoki bunday abonent/splitter topilmadi. Menyudagi tugmalardan foydalaning yoki to'g'ri login yozing.")
+                await message.answer("❌ Bunday abonent yoki splitter topilmadi. Loginni to'g'ri kiritganingizni tekshiring.")
     else:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
