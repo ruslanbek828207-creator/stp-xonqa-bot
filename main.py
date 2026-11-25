@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import os
 import sys
 import pandas as pd
@@ -29,6 +30,7 @@ authorized_users = set()
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 EXCEL_TAYANCH_CANDIDATES = [
+    "Tayanch OLT_4.xlsx",
     "Tayanch OLT_3.xlsx",
     "Tayanch OLT_2.xlsx",
     "Tayanch OLT.xlsx"
@@ -37,6 +39,8 @@ EXCEL_TAYANCH_CANDIDATES = [
 splitters_list = []
 subscribers_list = []
 tayanch_olt_list = []
+tayanch_splitters_order = []
+tayanch_by_splitter = {}
 
 def clean_phone(val) -> str:
     if pd.isna(val):
@@ -48,6 +52,10 @@ def clean_phone(val) -> str:
         return str(int(float(s)))
     except (ValueError, TypeError):
         return s
+
+def short_splitter_label(full_name: str) -> str:
+    cleaned = full_name.replace("OLT Таянч", "").strip()
+    return cleaned if cleaned else full_name
 
 # 1. Сплиттерлар базасини ўқиш
 try:
@@ -106,7 +114,7 @@ try:
 except Exception as e:
     print(f"❌ Абонентлар файлини ўқишда хатолик: {e}")
 
-# 3. Янгиланган Tayanch OLT_3.xlsx базасини ўқиш
+# 3. Tayanch OLT базасини ўқиш
 try:
     tayanch_file = next((f for f in EXCEL_TAYANCH_CANDIDATES if os.path.exists(f)), None)
     if tayanch_file:
@@ -137,6 +145,9 @@ try:
             if pd.isna(port_raw):
                 if pd.notna(splitter_or_fio) and str(splitter_or_fio).strip():
                     current_splitter = " ".join(str(splitter_or_fio).split())
+                    if current_splitter not in tayanch_by_splitter:
+                        tayanch_splitters_order.append(current_splitter)
+                        tayanch_by_splitter[current_splitter] = []
                 else:
                     current_splitter = None
                 continue
@@ -161,7 +172,7 @@ try:
             ip_phone_str = clean_phone(ip_phone_val)
             ip_str = str(ip_val).strip() if pd.notna(ip_val) and str(ip_val).strip() not in ("", "nan") else "-"
 
-            tayanch_olt_list.append({
+            port_entry = {
                 "splitter": current_splitter,
                 "port": port_num,
                 "client": fio_str,
@@ -170,8 +181,11 @@ try:
                 "phone": phone_str,
                 "ip_phone": ip_phone_str,
                 "ip": ip_str
-            })
-        print(f"✅ {tayanch_file} ({sheet_olt}) базаси юкланди: {len(tayanch_olt_list)} та порт")
+            }
+            tayanch_olt_list.append(port_entry)
+            tayanch_by_splitter[current_splitter].append(port_entry)
+
+        print(f"✅ {tayanch_file} ({sheet_olt}) базаси юкланди: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт")
 except Exception as e:
     print(f"❌ Tayanch OLT файлини ўқишда хатолик: {e}")
 
@@ -205,11 +219,73 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
         ],
         [
+            KeyboardButton(text="🔌 Tayanch OLT"),
             KeyboardButton(text="👷 Электрамонтёрлар")
         ]
     ],
     resize_keyboard=True
 )
+
+def build_tayanch_page_keyboard(page: int, page_size: int = 20) -> InlineKeyboardMarkup:
+    total_items = len(tayanch_splitters_order)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    start_idx = page * page_size
+    end_idx = start_idx + page_size
+    chunk = tayanch_splitters_order[start_idx:end_idx]
+
+    rows = []
+    row = []
+    for idx in range(start_idx, min(end_idx, total_items)):
+        sp_name = tayanch_splitters_order[idx]
+        busy_cnt = sum(1 for p in tayanch_by_splitter.get(sp_name, []) if p["client"] != "Бўш порт")
+        label = f"{short_splitter_label(sp_name)} ({busy_cnt}/8)"
+        row.append(InlineKeyboardButton(text=label, callback_data=f"tolt_sp_{idx}_{page}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Олдинги", callback_data=f"tolt_pg_{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"📄 {page + 1}/{total_pages}", callback_data="tolt_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Кейинги ➡️", callback_data=f"tolt_pg_{page + 1}"))
+    rows.append(nav_row)
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def format_splitter_ports_text(splitter_name: str) -> str:
+    ports = tayanch_by_splitter.get(splitter_name, [])
+    busy_cnt = sum(1 for p in ports if p["client"] != "Бўш порт")
+    free_cnt = len(ports) - busy_cnt
+
+    lines = [
+        f"🔌 <b>{splitter_name}</b>",
+        f"📊 Портлар: <b>{busy_cnt} банд</b> / <b>{free_cnt} бўш</b> (Жами: {len(ports)} та)\n"
+    ]
+
+    for p in ports:
+        if p["client"] == "Бўш порт":
+            lines.append(f"<b>{p['port']}-порт:</b> ⚪ <i>Бўш порт</i>")
+        else:
+            extra = []
+            if p["ip_phone"] != "-":
+                extra.append(f"IP-тел: {p['ip_phone']}")
+            if p["ip"] != "-":
+                extra.append(f"IP: <code>{p['ip']}</code>")
+            extra_str = f" | {' | '.join(extra)}" if extra else ""
+
+            lines.append(
+                f"<b>{p['port']}-порт:</b> 🟢 <b>{p['client']}</b>\n"
+                f"   🔑 Логин: <code>{p['login']}</code> | 📞 Тел: {p['phone']}{extra_str}\n"
+                f"   🏠 Манзил: {p['address']}"
+            )
+
+    return "\n".join(lines)
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
@@ -231,7 +307,7 @@ async def stats_handler(message: Message) -> None:
     await message.answer(
         f"📊 Паролни киритиб уланган ходимлар: {len(authorized_users)} та\n"
         f"📦 Сплиттерлар: {len(splitters_list)} та\n"
-        f"🔌 Tayanch OLT портлари: {len(tayanch_olt_list)} та (Банд: {busy_ports} та)\n"
+        f"🔌 Tayanch OLT: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт (Банд: {busy_ports} та)\n"
         f"👥 Хонқа абонентлари: {len(subscribers_list)} та"
     )
 
@@ -255,6 +331,17 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "🔍 Абонент ва сплиттер қидириш":
             await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>2/16/4</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
+        elif text == "🔌 Tayanch OLT":
+            if not tayanch_splitters_order:
+                await message.answer("❌ Tayanch OLT базаси бўш ёки файл топилмади.")
+                return
+            busy_ports = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
+            await message.answer(
+                f"🔌 <b>Tayanch OLT сплиттерлари</b> (Жами: {len(tayanch_splitters_order)} та сплиттер, {busy_ports}/{len(tayanch_olt_list)} порт банд)\n"
+                f"Керакли сплиттерни танланг:",
+                reply_markup=build_tayanch_page_keyboard(0),
+                parse_mode=ParseMode.HTML
+            )
         elif text == "👷 Электрамонтёрлар":
             buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
             await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -357,11 +444,43 @@ async def callback_handler(callback: CallbackQuery) -> None:
         return
 
     data_id = callback.data
-    if data_id.startswith("elect_"):
+    if data_id == "tolt_noop":
+        await callback.answer()
+        return
+    elif data_id.startswith("tolt_pg_"):
+        page = int(data_id.replace("tolt_pg_", ""))
+        await callback.message.edit_reply_markup(reply_markup=build_tayanch_page_keyboard(page))
+        await callback.answer()
+    elif data_id.startswith("tolt_back_"):
+        page = int(data_id.replace("tolt_back_", ""))
+        busy_ports = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
+        await callback.message.edit_text(
+            f"🔌 <b>Tayanch OLT сплиттерлари</b> (Жами: {len(tayanch_splitters_order)} та сплиттер, {busy_ports}/{len(tayanch_olt_list)} порт банд)\n"
+            f"Керакли сплиттерни танланг:",
+            reply_markup=build_tayanch_page_keyboard(page),
+            parse_mode=ParseMode.HTML
+        )
+        await callback.answer()
+    elif data_id.startswith("tolt_sp_"):
+        parts = data_id.replace("tolt_sp_", "").split("_")
+        sp_idx = int(parts[0])
+        ret_page = int(parts[1]) if len(parts) > 1 else 0
+        if 0 <= sp_idx < len(tayanch_splitters_order):
+            sp_name = tayanch_splitters_order[sp_idx]
+            ports_text = format_splitter_ports_text(sp_name)
+            back_kb = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="⬅️ Сплиттерларга қайтиш", callback_data=f"tolt_back_{ret_page}")]]
+            )
+            await callback.message.edit_text(ports_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
+        else:
+            await callback.answer("Сплиттер топилмади.", show_alert=True)
+            return
+        await callback.answer()
+    elif data_id.startswith("elect_"):
         data = ELECTRICIANS_DATA.get(data_id)
         text = f"👷 <b>{data['name']}</b>\n📞 Тел: {data['phone']}\n📍 Зона: {data['zone']}\n🛠 Вазифа: {data['task']}" if data else "Топилмади."
         await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    await callback.answer()
+        await callback.answer()
 
 async def handle_ping(request):
     return web.Response(text="Бот ишлаяпти!")
