@@ -37,6 +37,25 @@ EXCEL_OLT_CANDIDATES = [
     "Tayanch OLT.xlsx"
 ]
 
+# Қўшимча OLT рўйхати (тугмалар учун)
+EXTRA_OLT_NAMES = [
+    "Марказ",
+    "Дурвадик",
+    "Олажа",
+    "Марказ2",
+    "Нурафшон",
+    "Навои",
+    "Олтин сохил",
+    "Пахтакор",
+    "Дўстлик",
+    "Дурман",
+    "Хонкобод",
+    "Ёш куч",
+    "Туркистон",
+    "Янги Турмуш",
+    "Пахтагул",
+]
+
 splitters_list = []
 subscribers_list = []
 
@@ -44,7 +63,7 @@ subscribers_list = []
 tayanch_olt_list = []
 tayanch_splitters_order = []
 tayanch_by_splitter = {}
-tayanch_montyor = "JUMANIYAZOV RUSLAN"
+tayanch_montyor = "ELEKTRAMANTYORI JUMANIYAZOV RUSLAN"
 
 # TOMA OLT маълумотлари
 toma_olt_list = []
@@ -75,7 +94,6 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
     if "ELEKTRAMANTYORI" in first_col_header.upper():
         detected_montyor = " ".join(first_col_header.split())
 
-    # Агар 0-қаторда "Spllikter" сарлавҳаси турган бўлса, уни устун номи сифатида қўллаш
     row0_col1 = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet) > 0 and len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
     if row0_col1.lower() in ("spllikter", "splitter", "сплиттер"):
         new_cols = list(df_sheet.columns)
@@ -258,8 +276,8 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Хонқа тумани, Олмазор МФЙ", "task": "Электр ва оптик тармоқларда профилактика ишлари."},
 }
 
-keyboard = ReplyKeyboardMarkup(
-    keyboard=[
+def build_main_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
         [
             KeyboardButton(text="🌐 Интернет тарифлари"),
             KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
@@ -271,9 +289,17 @@ keyboard = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="👷 Электрамонтёрлар")
         ]
-    ],
-    resize_keyboard=True
-)
+    ]
+    for i in range(0, len(EXTRA_OLT_NAMES), 2):
+        pair = [KeyboardButton(text=f"🏢 OLT {EXTRA_OLT_NAMES[i]}")]
+        if i + 1 < len(EXTRA_OLT_NAMES):
+            pair.append(KeyboardButton(text=f"🏢 OLT {EXTRA_OLT_NAMES[i + 1]}"))
+        rows.append(pair)
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+keyboard = build_main_keyboard()
+
+EXTRA_OLT_BUTTON_MAP = {f"🏢 OLT {name}": name for name in EXTRA_OLT_NAMES}
 
 def build_olt_page_keyboard(
     splitters_order: list[str],
@@ -343,6 +369,38 @@ def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[d
 
     return "\n".join(lines)
 
+def format_extra_olt_summary(olt_name: str) -> str:
+    kw = olt_name.lower().strip()
+    matched_ports = [
+        p for p in (tayanch_olt_list + toma_olt_list)
+        if kw in f"{p['splitter']} {p['client']} {p['login']} {p['address']}".lower()
+    ]
+    matched_splitters = [
+        s for s in splitters_list
+        if kw in f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
+    ]
+
+    lines = [f"🏢 <b>OLT: {olt_name}</b>"]
+    if matched_ports:
+        lines.append(f"🔌 OLT портларда топилди: <b>{len(matched_ports)} та</b>\n")
+        for item in matched_ports[:8]:
+            lines.append(
+                f"🏷 <b>{item['splitter']}</b> (Порт: {item['port']}) — <b>{item['client']}</b>\n"
+                f"   🔑 Логин: <code>{item['login']}</code> | 📞 Тел: {item['phone']}\n"
+                f"   🏠 Манзил: {item['address']}"
+            )
+    if matched_splitters:
+        lines.append(f"\n⚡ Сплиттерлар базасида топилди: <b>{len(matched_splitters)} та</b>\n")
+        for s in matched_splitters[:5]:
+            lines.append(
+                f"📍 <b>{s['town']}</b> — <b>{s['number']}</b> ({s['splitter']} / {s['model']})\n"
+                f"   🏠 Манзил: {s['address']} | S/N: <code>{s['real_sn']}</code>"
+            )
+    if not matched_ports and not matched_splitters:
+        lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
+
+    return "\n".join(lines)
+
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     if message.from_user.id == ADMIN_ID or message.from_user.id in authorized_users:
@@ -365,8 +423,11 @@ async def stats_handler(message: Message) -> None:
         f"📊 Паролни киритиб уланган ходимлар: {len(authorized_users)} та\n"
         f"📦 Сплиттерлар: {len(splitters_list)} та\n"
         f"🔌 Tayanch OLT: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт (Банд: {t_busy} та)\n"
+        f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
         f"📡 TOMA OLT: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт (Банд: {m_busy} та)\n"
-        f"👥 Хонқа абонентлари: {len(subscribers_list)} та"
+        f"🏢 Қўшимча OLT тугмалари: {len(EXTRA_OLT_NAMES)} та\n"
+        f"👥 Хонқа абонентлари: {len(subscribers_list)} та",
+        parse_mode=ParseMode.HTML
     )
 
 @dp.message()
@@ -418,6 +479,9 @@ async def text_handler(message: Message) -> None:
                 ),
                 parse_mode=ParseMode.HTML
             )
+        elif text in EXTRA_OLT_BUTTON_MAP:
+            olt_title = EXTRA_OLT_BUTTON_MAP[text]
+            await message.answer(format_extra_olt_summary(olt_title), parse_mode=ParseMode.HTML)
         elif text == "👷 Электрамонтёрлар":
             buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
             await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -524,7 +588,6 @@ async def callback_handler(callback: CallbackQuery) -> None:
 
     data_id = callback.data
 
-    # Tayanch OLT callbacklari
     if data_id == "tolt_noop":
         await callback.answer()
         return
@@ -566,7 +629,6 @@ async def callback_handler(callback: CallbackQuery) -> None:
             return
         await callback.answer()
 
-    # TOMA OLT callbacklari
     elif data_id == "molt_noop":
         await callback.answer()
         return
