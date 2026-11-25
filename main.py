@@ -189,15 +189,7 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
         ],
         [
-            KeyboardButton(text="🏘 Қишлоқ ва шаҳарчалар"),
-            KeyboardButton(text="🏢 10-учаска объектлари")
-        ],
-        [
             KeyboardButton(text="👷 Электрамонтёрлар"),
-            KeyboardButton(text="🛠 Хизматлар ва мурожаат")
-        ],
-        [
-            KeyboardButton(text="📞 Боғланиш"),
             KeyboardButton(text="📊 OSS Портал", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/"))
         ],
         [
@@ -249,28 +241,9 @@ async def text_handler(message: Message) -> None:
             )
         elif text == "🔍 Абонент ва сплиттер қидириш":
             await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами ёки сплиттер номини киритинг (масалан: <code>m897730</code>, <code>1/1/1</code> ёки <code>Markaz 1/1/1</code>):", parse_mode=ParseMode.HTML)
-        elif text == "🏘 Қишлоқ ва шаҳарчалар":
-            buttons = []
-            row = []
-            for t in TOWNS_LIST:
-                short_name = t.replace(" қишлоғи", "").replace(" шаҳарчаси", "")
-                row.append(InlineKeyboardButton(text=f"🏘 {short_name}", callback_data=f"town_{t}"))
-                if len(row) == 2:
-                    buttons.append(row)
-                    row = []
-            if row:
-                buttons.append(row)
-            await message.answer("<b>Хонқа туманидаги қишлоқ ва шаҳарчалар:</b>\nКеракли ҳудудни танланг:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
-        elif text == "🏢 10-учаска объектлари":
-            buttons = [[InlineKeyboardButton(text=f"📍 {val['name']}", callback_data=key)] for key, val in UCHASKA_10_DATA.items()]
-            await message.answer("<b>10-учаска ҳудудлари ва манзиллари:</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
         elif text == "👷 Электрамонтёрлар":
             buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
             await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
-        elif text == "🛠 Хизматлар ва мурожаат":
-            await message.answer("<b>Техник хизматлар ва ўрнатиш:</b>\n• Оптик фибер сварка\n• Бетон столбаларда ишлаш\nМурожаат: +998995603937")
-        elif text == "📞 Боғланиш":
-            await message.answer("📞 <b>Алоқа:</b> +998995603937 (Хонқа тумани)")
         else:
             query = text.lower().strip()
             keywords = query.split()
