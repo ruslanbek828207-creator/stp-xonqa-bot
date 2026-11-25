@@ -4,7 +4,7 @@ import os
 import sys
 import pandas as pd
 from aiohttp import web
-from aiogram import Bot, Dispatcher, html, F
+from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
@@ -14,8 +14,7 @@ from aiogram.types import (
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    CallbackQuery,
-    WebAppInfo
+    CallbackQuery
 )
 
 TOKEN = "9125362206:AAF4zONlkd5e81kfoZthNBTkwQ8TRa5-UQY"
@@ -26,16 +25,27 @@ SECRET_PASSWORD = "3939"
 
 authorized_users = set()
 
-# Янги юборилган сплиттерлар, абонентлар ва Таянч OLT файл номлари
+# Excel файл номлари
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
-EXCEL_TAYANCH_OLT = "Tayanch OLT.xlsx"
+EXCEL_TAYANCH_CANDIDATES = ["Tayanch OLT_2.xlsx", "Tayanch OLT.xlsx"]
 
 splitters_list = []
 subscribers_list = []
 tayanch_olt_list = []
 
-# Сплиттерлар базасини ўқиш
+def clean_phone(val) -> str:
+    if pd.isna(val):
+        return "-"
+    s = str(val).replace("\xa0", "").strip()
+    if not s or s.lower() == "nan":
+        return "-"
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        return s
+
+# 1. Сплиттерлар базасини ўқиш
 try:
     if os.path.exists(EXCEL_SPLITTERS):
         df_raw = pd.read_excel(EXCEL_SPLITTERS, skiprows=11)
@@ -61,7 +71,7 @@ try:
 except Exception as e:
     print(f"❌ Сплиттер файлини ўқишда хатолик: {e}")
 
-# Абонентлар базасини ўқиш
+# 2. Абонентлар базасини ўқиш
 try:
     if os.path.exists(EXCEL_SUBSCRIBERS):
         xls = pd.ExcelFile(EXCEL_SUBSCRIBERS)
@@ -92,72 +102,68 @@ try:
 except Exception as e:
     print(f"❌ Абонентлар файлини ўқишда хатолик: {e}")
 
-# Tayanch OLT.xlsx базасини ўқиш
+# 3. Янгиланган Tayanch OLT_2.xlsx / Tayanch OLT.xlsx базасини ўқиш
 try:
-    if os.path.exists(EXCEL_TAYANCH_OLT):
-        xls_olt = pd.ExcelFile(EXCEL_TAYANCH_OLT)
+    tayanch_file = next((f for f in EXCEL_TAYANCH_CANDIDATES if os.path.exists(f)), None)
+    if tayanch_file:
+        xls_olt = pd.ExcelFile(tayanch_file)
         sheet_olt = "Лист1" if "Лист1" in xls_olt.sheet_names else xls_olt.sheet_names[0]
-        df_olt = pd.read_excel(EXCEL_TAYANCH_OLT, sheet_name=sheet_olt)
+        df_olt = pd.read_excel(tayanch_file, sheet_name=sheet_olt)
         df_olt.columns = [
             str(col).strip() if not str(col).startswith("Unnamed") else str(col)
             for col in df_olt.columns
         ]
 
-        current_splitter = "OLT Таянч"
+        current_splitter = None
         for _, row in df_olt.iterrows():
             port_raw = row.get("Unnamed: 0")
             splitter_or_fio = row.get("Spllikter")
             login_val = row.get("Login")
-            address_val = row.get("Unnamed: 3")
+            address_val = row.get("Manzil") if "Manzil" in df_olt.columns else row.get("Unnamed: 3")
             phone_val = row.get("Telfon nomeri")
+            ip_phone_val = row.get("ip-telfon")
+            ip_val = row.get("ip")
 
-            if pd.isna(port_raw) and pd.notna(splitter_or_fio):
-                current_splitter = " ".join(str(splitter_or_fio).split())
+            if pd.isna(port_raw):
+                if pd.notna(splitter_or_fio) and str(splitter_or_fio).strip():
+                    current_splitter = " ".join(str(splitter_or_fio).split())
+                else:
+                    current_splitter = None
                 continue
 
-            if pd.notna(port_raw):
-                try:
-                    port_num = str(int(float(port_raw)))
-                except (ValueError, TypeError):
-                    port_num = str(port_raw).strip()
+            if not current_splitter:
+                continue
 
-                fio_str = " ".join(str(splitter_or_fio).split()) if pd.notna(splitter_or_fio) else "Бўш порт"
-                login_str = str(login_val).strip() if pd.notna(login_val) and str(login_val).strip() != 'nan' else '-'
-                addr_str = " ".join(str(address_val).split()) if pd.notna(address_val) and str(address_val).strip() != 'nan' else '-'
+            try:
+                port_num = str(int(float(port_raw)))
+            except (ValueError, TypeError):
+                port_num = str(port_raw).strip()
 
-                if pd.notna(phone_val) and str(phone_val).strip() != 'nan':
-                    try:
-                        phone_str = str(int(float(phone_val)))
-                    except (ValueError, TypeError):
-                        phone_str = str(phone_val).strip()
-                else:
-                    phone_str = '-'
+            raw_fio = " ".join(str(splitter_or_fio).replace("\xa0", " ").split()) if pd.notna(splitter_or_fio) else ""
+            if raw_fio in ("", "\\", "nan"):
+                fio_str = "Бўш порт"
+            else:
+                fio_str = raw_fio
 
-                tayanch_olt_list.append({
-                    "splitter": current_splitter,
-                    "port": port_num,
-                    "client": fio_str,
-                    "login": login_str,
-                    "address": addr_str,
-                    "phone": phone_str
-                })
-        print(f"✅ Tayanch OLT базаси юкланди: {len(tayanch_olt_list)} та порт")
+            login_str = str(login_val).strip() if pd.notna(login_val) and str(login_val).strip() not in ("", "nan") else "-"
+            addr_str = " ".join(str(address_val).replace("\xa0", " ").split()) if pd.notna(address_val) and str(address_val).strip() not in ("", "nan") else "-"
+            phone_str = clean_phone(phone_val)
+            ip_phone_str = clean_phone(ip_phone_val)
+            ip_str = str(ip_val).strip() if pd.notna(ip_val) and str(ip_val).strip() not in ("", "nan") else "-"
+
+            tayanch_olt_list.append({
+                "splitter": current_splitter,
+                "port": port_num,
+                "client": fio_str,
+                "login": login_str,
+                "address": addr_str,
+                "phone": phone_str,
+                "ip_phone": ip_phone_str,
+                "ip": ip_str
+            })
+        print(f"✅ {tayanch_file} базаси юкланди: {len(tayanch_olt_list)} та порт")
 except Exception as e:
     print(f"❌ Tayanch OLT файлини ўқишда хатолик: {e}")
-
-TOWNS_LIST = sorted(list(set(s['town'] for s in splitters_list if s['town'] and s['town'] != 'nan')))
-
-UCHASKA_10_DATA = {
-    "uch_1": {"name": "Ёрқин Юлдуз-2 берк кўчаси", "status": "Узлуксиз хизмат кўрсатишда", "signal": "Нормал (-19 dBm)"},
-    "uch_2": {"name": "Олажа қишлоғи, Yorqin yulduz уй", "status": "Фаол", "signal": "Яхши (-20 dBm)"},
-    "uch_3": {"name": "Олажа қишлоғи, Афсонавий кўчаси", "status": "Фаол", "signal": "Нормал (-22 dBm)"},
-    "uch_4": {"name": "Олажа қишлоғи, Ахли диёр кўчаси", "status": "Фаол", "signal": "Яхши (-18 dBm)"},
-    "uch_5": {"name": "Олажа қишлоғи, Барака кўчаси", "status": "Фаол", "signal": "Нормал (-21 dBm)"},
-    "uch_6": {"name": "Олажа қишлоғи, Бахтли оила кўчаси", "status": "Фаол", "signal": "Яхши (-19 dBm)"},
-    "uch_7": {"name": "Олажа қишлоғи, Бўстонлиқ кўчаси", "status": "Фаол", "signal": "Нормал (-23 dBm)"},
-    "uch_8": {"name": "Олажа қишлоғи, Бухоро кўчаси", "status": "Фаол", "signal": "Яхши (-20 dBm)"},
-    "uch_9": {"name": "Олажа қишлоғи, Буюк ипак йўли 3- йўлак кўчаси", "status": "Фаол", "signal": "Нормал (-22 dBm)"},
-}
 
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
@@ -189,12 +195,7 @@ keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
         ],
         [
-            KeyboardButton(text="👷 Электрамонтёрлар"),
-            KeyboardButton(text="📊 OSS Портал", web_app=WebAppInfo(url="https://oss.uztelecom.uz/dashboard/"))
-        ],
-        [
-            KeyboardButton(text="🗺 GeoWFM Харита", web_app=WebAppInfo(url="https://geowfm.uztelecom.uz/geoutr/equipments/filter")),
-            KeyboardButton(text="📱 MSMS Портал", web_app=WebAppInfo(url="https://msms.uztelecom.uz/"))
+            KeyboardButton(text="👷 Электрамонтёрлар")
         ]
     ],
     resize_keyboard=True
@@ -216,15 +217,18 @@ async def command_start_handler(message: Message) -> None:
 async def stats_handler(message: Message) -> None:
     if message.from_user.id != ADMIN_ID:
         return
+    busy_ports = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
     await message.answer(
         f"📊 Паролни киритиб уланган ходимлар: {len(authorized_users)} та\n"
         f"📦 Сплиттерлар: {len(splitters_list)} та\n"
-        f"🔌 Tayanch OLT портлари: {len(tayanch_olt_list)} та\n"
+        f"🔌 Tayanch OLT портлари: {len(tayanch_olt_list)} та (Банд: {busy_ports} та)\n"
         f"👥 Хонқа абонентлари: {len(subscribers_list)} та"
     )
 
 @dp.message()
 async def text_handler(message: Message) -> None:
+    if not message.text:
+        return
     user_id = message.from_user.id
     text = message.text.strip()
 
@@ -240,7 +244,7 @@ async def text_handler(message: Message) -> None:
                 parse_mode=ParseMode.HTML
             )
         elif text == "🔍 Абонент ва сплиттер қидириш":
-            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами ёки сплиттер номини киритинг (масалан: <code>m897730</code>, <code>1/1/1</code> ёки <code>Markaz 1/1/1</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>1/4/1</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
         elif text == "👷 Электрамонтёрлар":
             buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
             await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
@@ -262,7 +266,10 @@ async def text_handler(message: Message) -> None:
             # 2. Tayanch OLT сплиттер ва абонентларини қидириш
             found_tayanch = []
             for item in tayanch_olt_list:
-                combined_olt = f"{item['splitter']} порт {item['port']} {item['client']} {item['login']} {item['address']} {item['phone']}".lower()
+                combined_olt = (
+                    f"{item['splitter']} порт {item['port']} {item['client']} "
+                    f"{item['login']} {item['address']} {item['phone']} {item['ip_phone']} {item['ip']}"
+                ).lower()
                 if all(kw in combined_olt for kw in keywords):
                     found_tayanch.append(item)
 
@@ -293,13 +300,20 @@ async def text_handler(message: Message) -> None:
 
                 if found_tayanch:
                     response += f"🔌 <b>Tayanch OLT (Жами: {len(found_tayanch)} та):</b>\n\n"
-                    for item in found_tayanch[:5]:
+                    for item in found_tayanch[:8]:
+                        extra_info = ""
+                        if item['ip_phone'] != '-':
+                            extra_info += f"☎️ <b>IP-тел:</b> {item['ip_phone']}\n"
+                        if item['ip'] != '-':
+                            extra_info += f"🌐 <b>IP:</b> <code>{item['ip']}</code>\n"
+
                         response += (
                             f"🏷 <b>Сплиттер:</b> {item['splitter']} (Порт: {item['port']})\n"
                             f"👨‍💼 <b>Ф.И.Ш:</b> {item['client']}\n"
                             f"🔑 <b>Логин:</b> <code>{item['login']}</code>\n"
                             f"🏠 <b>Манзил:</b> {item['address']}\n"
                             f"📞 <b>Тел:</b> {item['phone']}\n"
+                            f"{extra_info}"
                             f"-----------------------------------\n"
                         )
                 
@@ -321,7 +335,7 @@ async def text_handler(message: Message) -> None:
     else:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
-            await message.answer("✅ Парол тўғри! Хуш келибсиз. Қуйидаги менюдан фойдаланишингиз mumkin:", reply_markup=keyboard)
+            await message.answer("✅ Парол тўғри! Хуш келибсиз. Қуйидаги менюдан фойдаланишингиз мумкин:", reply_markup=keyboard)
         else:
             await message.answer("❌ Нотўғри парол! Илтимос, тўғри паролни киритинг:")
 
@@ -333,27 +347,7 @@ async def callback_handler(callback: CallbackQuery) -> None:
         return
 
     data_id = callback.data
-    if data_id.startswith("town_"):
-        town_name = data_id.replace("town_", "")
-        found = [s for s in splitters_list if s['town'] == town_name]
-        
-        response = f"🏘 <b>{town_name} бўйича сплиттерлар (Жами: {len(found)} та):</b>\n\n"
-        for item in found[:10]:
-            response += (
-                f"🏷 <b>Номи:</b> {item['number']}\n"
-                f"⚙️ <b>Тури:</b> {item['splitter']} ({item['model']})\n"
-                f"🏠 <b>Манзил:</b> {item['address']}\n"
-                f"🔢 <b>S/N:</b> {item['real_sn']}\n"
-                f"-----------------------------------\n"
-            )
-        if len(found) > 10:
-            response += f"\n<i>Фақат дастлабки 10 таси кўрсатилди.</i>"
-        await callback.message.answer(response, parse_mode=ParseMode.HTML)
-    elif data_id.startswith("uch_"):
-        data = UCHASKA_10_DATA.get(data_id)
-        text = f"🏢 <b>{data['name']}</b>\n📌 Ҳолати: {data['status']}\n⚡ Сигнал: {data['signal']}" if data else "Топилмади."
-        await callback.message.answer(text, parse_mode=ParseMode.HTML)
-    elif data_id.startswith("elect_"):
+    if data_id.startswith("elect_"):
         data = ELECTRICIANS_DATA.get(data_id)
         text = f"👷 <b>{data['name']}</b>\n📞 Тел: {data['phone']}\n📍 Зона: {data['zone']}\n🛠 Вазифа: {data['task']}" if data else "Топилмади."
         await callback.message.answer(text, parse_mode=ParseMode.HTML)
