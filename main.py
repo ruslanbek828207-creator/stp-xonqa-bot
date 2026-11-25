@@ -28,7 +28,11 @@ authorized_users = set()
 # Excel файл номлари
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
-EXCEL_TAYANCH_CANDIDATES = ["Tayanch OLT_2.xlsx", "Tayanch OLT.xlsx"]
+EXCEL_TAYANCH_CANDIDATES = [
+    "Tayanch OLT_3.xlsx",
+    "Tayanch OLT_2.xlsx",
+    "Tayanch OLT.xlsx"
+]
 
 splitters_list = []
 subscribers_list = []
@@ -102,12 +106,18 @@ try:
 except Exception as e:
     print(f"❌ Абонентлар файлини ўқишда хатолик: {e}")
 
-# 3. Янгиланган Tayanch OLT_2.xlsx / Tayanch OLT.xlsx базасини ўқиш
+# 3. Янгиланган Tayanch OLT_3.xlsx базасини ўқиш
 try:
     tayanch_file = next((f for f in EXCEL_TAYANCH_CANDIDATES if os.path.exists(f)), None)
     if tayanch_file:
         xls_olt = pd.ExcelFile(tayanch_file)
-        sheet_olt = "Лист1" if "Лист1" in xls_olt.sheet_names else xls_olt.sheet_names[0]
+        for preferred in ["Tayanch OLT", "Лист1"]:
+            if preferred in xls_olt.sheet_names:
+                sheet_olt = preferred
+                break
+        else:
+            sheet_olt = xls_olt.sheet_names[0]
+
         df_olt = pd.read_excel(tayanch_file, sheet_name=sheet_olt)
         df_olt.columns = [
             str(col).strip() if not str(col).startswith("Unnamed") else str(col)
@@ -161,7 +171,7 @@ try:
                 "ip_phone": ip_phone_str,
                 "ip": ip_str
             })
-        print(f"✅ {tayanch_file} базаси юкланди: {len(tayanch_olt_list)} та порт")
+        print(f"✅ {tayanch_file} ({sheet_olt}) базаси юкланди: {len(tayanch_olt_list)} та порт")
 except Exception as e:
     print(f"❌ Tayanch OLT файлини ўқишда хатолик: {e}")
 
@@ -244,7 +254,7 @@ async def text_handler(message: Message) -> None:
                 parse_mode=ParseMode.HTML
             )
         elif text == "🔍 Абонент ва сплиттер қидириш":
-            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>1/4/1</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>2/16/4</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
         elif text == "👷 Электрамонтёрлар":
             buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
             await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
