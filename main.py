@@ -37,6 +37,19 @@ EXCEL_OLT_CANDIDATES = [
     "Tayanch OLT.xlsx"
 ]
 
+MUFTA_FILES = [
+    "Shodiyona ko’chasi Mufta.xlsx",
+    "А.Қаҳҳор кўчаси 47-уй Муфта.xlsx",
+    "Гайрат махалласи Узумзор 59-уй.xlsx",
+    "Гулобод Муфта сарапаён.xlsx",
+    "Дала шипон Муфма.xlsx",
+    "Дўрмон кўчаси, 1 уй.xlsx",
+    "Дўстлик кўчаси 23-уй Муфта.xlsx",
+    "Жайхун қуёши болалар оромгоҳига олиб борувчи йўл.xlsx",
+    "Кутлткадам муфта.xlsx",
+    "Қорақош 9-мактаб Наврўз кўчаси дом. 45.xlsx",
+]
+
 # Қўшимча OLT рўйхати (тугмалар учун)
 EXTRA_OLT_NAMES = [
     "Марказ",
@@ -56,8 +69,154 @@ EXTRA_OLT_NAMES = [
     "Пахтагул",
 ]
 
+# Код ичидаги тайёр муфталар базаси (Excel файллар юкланмаса ҳам ишлайди)
+DEFAULT_MUFTALAR_LIST = [
+    {
+        "title": "Shodiyona ko'chasi Mufta",
+        "sheets": ["Shodiyona ko’chasi"],
+        "addresses": [
+            "Xonqa tumani Istiqlol maxallasi Shodiyona ko’chasi 36-uy",
+            "Shodiyona ko’chasi 10-uy",
+            "Shodiyona ko’chasi 76-uy",
+            "Shodiyona ko’chasi 38-uy"
+        ],
+        "cables": ["Mavjud FIG-8 Aerial Loose Tube Cable G.652D 8F"],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "А.Қаҳҳор кўчаси 47-уй Муфта",
+        "sheets": ["Хонқобод махалласи"],
+        "addresses": [
+            "Хонқа туман Порлоқ махалласи А.Қаҳҳор кўчаси 47-уй",
+            "А.Қаҳҳор кўчаси 47-уй"
+        ],
+        "cables": [
+            "FIG-8 Aerial Loose Tube Cable G.652D 6F 6.6*12.7",
+            "NXTС8S-8B1.3 138 м"
+        ],
+        "meta": [
+            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
+            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
+        ]
+    },
+    {
+        "title": "Ғайрат махалласи Узумзор 59-уй",
+        "sheets": ["Гайрат махалласи Узумзор 59-уй"],
+        "addresses": [
+            "Хонқа туман Гайрат махалласи Узумзор кўчаси 59-уй",
+            "Хонқа туман Гайрат махалласи Узумзор кўчаси 96-уй",
+            "Умид ниҳоллари кўчаси, 28 уй Қорақош (Ленин) қишлоғи"
+        ],
+        "cables": ["NXTС8S-8B1.3 1.7mm"],
+        "meta": [
+            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
+            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
+        ]
+    },
+    {
+        "title": "Гулобод Муфта (Сарапаён)",
+        "sheets": ["Гулобод Муфта", "Гулобод Муфта 2"],
+        "addresses": [
+            "Хонқа туман Истиқлол махалласи Гулобод кўчаси 37-уй",
+            "Хонқа туман Истиқлол махалласи Гулзор кўчаси 4-уй",
+            "Хонқа тумани Сарапаян қишлоғи Истиқлол махалласи Дўстлик кўчаси 23-уй",
+            "Гулобод кўчаси 43-уй, 79-уй"
+        ],
+        "cables": [
+            "NJXTA-32B1.3",
+            "FIG-8 Aerial Loose Tube Cable G.652D 12F",
+            "NJXTW-8B1.3",
+            "NXTC8S-12B1.3 ОКТцМ-П-8Е (1х8)-1.5 kH"
+        ],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "Дала шипон Муфта (1 ва 2)",
+        "sheets": ["Дала шипон Муфма 1", "Дала шипон Муфта 2"],
+        "addresses": [
+            "Қутлуғқадам 1-уй, Томадурвадик қишлоғи",
+            "Қутлиқадам кўчаси 1-уй"
+        ],
+        "cables": [
+            "NXTC8S-48B1.3",
+            "ВОК-48 воздушный (FIG-8 Aerial Armored Optical Fiber Cable G.652D 48F 9.6*15.7)"
+        ],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "Дўрмон кўчаси, 1-уй Муфта",
+        "sheets": ["Дўрмон кўчаси, 1 уй", "4-5-6"],
+        "addresses": [
+            "Дўрмон кўчаси, 1 уй Қирқёп қишлоғи",
+            "Дўрмон кўчаси, 7 уй Қирқёп қишлоғи",
+            "Хонка Темирчилар кўчаси, 6 уй Қирқёп қишлоғи",
+            "Юксалиш кўчаси, 49 уй Қирқёп қишлоғи"
+        ],
+        "cables": [
+            "NJXTA-48B1.3",
+            "FIG-8 Aerial Tube Cable G.652D 6F",
+            "ОКНСМ-10-01-0,22-12"
+        ],
+        "meta": [
+            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
+            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
+        ]
+    },
+    {
+        "title": "Дўстлик кўчаси 23-уй Муфта",
+        "sheets": ["Гулобод Муфта"],
+        "addresses": [
+            "Хонқа туман Истиқлол махалласи Гулобод кўчаси 23-уй",
+            "Хоразм вилояти, Хонқа тумани, Сарапоён қишлоғи, Дўстлик кўчаси дом 76"
+        ],
+        "cables": ["NJXTW-8B1.3"],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "Жайхун қуёши болалар оромгоҳи йўли",
+        "sheets": ["Жайхун қуёши болалар оромгоҳига"],
+        "addresses": [
+            "Хонқа туман Томадургадик қишлоғи Жайхун қуёши болалар оромгоҳига олиб борувчи йўл"
+        ],
+        "cables": [
+            "NXTC8S-12B1.3",
+            "FIG-8 Aerial Loose Tube Cable 6F 546 м"
+        ],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "Қутлуғқадам муфта",
+        "sheets": ["Лист1"],
+        "addresses": [
+            "Қутлуғқадам кўчаси, 62 уй Томадурвадик қишлоғи",
+            "Қутлиқадам кўчаси 1-уй",
+            "Мустақиллик кўчаси 45"
+        ],
+        "cables": [
+            "NXTA-32B1.3",
+            "NXTC8S-24B1.3",
+            "ОКТ-П-48Е- (4х12)-6кН"
+        ],
+        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
+    },
+    {
+        "title": "Қорақош 9-мактаб Наврўз кўчаси дом 45",
+        "sheets": ["Лист1"],
+        "addresses": [
+            "Хоразм вилояти, Хонқа тумани, Қорақош (Ленин) қишлоғи, Наврўз кўчаси дом 45",
+            "Наврўз кўчаси, 44 уй Қорақош (Ленин) қишлоғи"
+        ],
+        "cables": [
+            "NXTС8S-48B1.3 1.7mm",
+            "NXTC8S-48B1.3"
+        ],
+        "meta": ["Паспорт 2024 йилнинг Апрел куни тузилган"]
+    }
+]
+
 splitters_list = []
 subscribers_list = []
+muftalar_list = []
 
 # Tayanch OLT маълумотлари
 tayanch_olt_list = []
@@ -174,6 +333,45 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
 
     return ports_out, order_out, by_sp_out, detected_montyor
 
+def parse_mufta_workbook(fpath: str) -> dict | None:
+    try:
+        xls = pd.ExcelFile(fpath)
+        addresses = []
+        cables = []
+        meta = []
+        sheets = [s.strip() for s in xls.sheet_names]
+        for s in xls.sheet_names:
+            df = pd.read_excel(fpath, sheet_name=s, header=None)
+            for r in range(df.shape[0]):
+                for c in range(df.shape[1]):
+                    v = df.iat[r, c]
+                    if pd.isna(v):
+                        continue
+                    sv = " ".join(str(v).split())
+                    low = sv.lower()
+                    if "манзил:" in low or "қишлоғ" in low or "кўчаси" in low or "махалласи" in low:
+                        val = sv.split(":", 1)[1].strip() if ":" in sv else sv
+                        if val and val not in addresses:
+                            addresses.append(val)
+                    elif "маркаси:" in low or "cable" in low or "nx" in low or "вок-" in low or "окт" in low or "окнсм" in low:
+                        val = sv.split(":", 1)[1].strip() if ":" in sv else sv
+                        if val and len(val) > 3 and val not in cables:
+                            cables.append(val)
+                    elif "паспорт 20" in low or "муфтанинг техник" in low or "пайвандланган" in low:
+                        if sv not in meta:
+                            meta.append(sv)
+        title = os.path.splitext(os.path.basename(fpath))[0]
+        return {
+            "title": title,
+            "sheets": sheets,
+            "addresses": addresses,
+            "cables": cables,
+            "meta": meta
+        }
+    except Exception as e:
+        print(f"❌ Муфта файлини ўқишда хатолик ({fpath}): {e}")
+        return None
+
 # 1. Сплиттерлар базасини ўқиш
 try:
     if os.path.exists(EXCEL_SPLITTERS):
@@ -254,6 +452,18 @@ try:
 except Exception as e:
     print(f"❌ OLT файлини ўқишда хатолик: {e}")
 
+# 4. Муфталар базасини юклаш (файллар мавжуд бўлса ўқийди, бўлмаса захира рўйхатни олади)
+existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
+if existing_mufta_files:
+    for mf in existing_mufta_files:
+        parsed = parse_mufta_workbook(mf)
+        if parsed:
+            muftalar_list.append(parsed)
+    print(f"✅ Муфталар файллардан юкланди: {len(muftalar_list)} та")
+else:
+    muftalar_list = list(DEFAULT_MUFTALAR_LIST)
+    print(f"✅ Муфталар захира базадан юкланди: {len(muftalar_list)} та")
+
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
     "elect_2": {"name": "Отабоев Рамзиддин Рахматилло угли", "phone": "+998995603938", "zone": "Хонқа тумани, Пахтакор МФЙ", "task": "Бетон столбаларда ишлаш, drop кабель тортиш ва роутерларни созлаш."},
@@ -287,6 +497,7 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="📡 TOMA")
         ],
         [
+            KeyboardButton(text="🧵 Muftalar"),
             KeyboardButton(text="👷 Электрамонтёрлар")
         ]
     ]
@@ -300,6 +511,30 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
 keyboard = build_main_keyboard()
 
 EXTRA_OLT_BUTTON_MAP = {f"🏢 OLT {name}": name for name in EXTRA_OLT_NAMES}
+
+def build_muftalar_keyboard() -> InlineKeyboardMarkup:
+    rows = []
+    for idx, m in enumerate(muftalar_list):
+        rows.append([InlineKeyboardButton(text=f"🧵 {m['title']}", callback_data=f"mufta_{idx}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def format_mufta_card(m: dict) -> str:
+    lines = [f"🧵 <b>{m['title']}</b>"]
+    if m.get("sheets"):
+        lines.append(f"📑 Варақлар: <i>{', '.join(m['sheets'])}</i>")
+    if m.get("addresses"):
+        lines.append("\n📍 <b>Манзиллар (кирувчи/чиқувчи):</b>")
+        for adr in m["addresses"]:
+            lines.append(f"   • {adr}")
+    if m.get("cables"):
+        lines.append("\n🔌 <b>Кабель маркалари:</b>")
+        for cb in m["cables"]:
+            lines.append(f"   • <code>{cb}</code>")
+    if m.get("meta"):
+        lines.append("\n📋 <b>Паспорт маълумоти:</b>")
+        for mt in m["meta"]:
+            lines.append(f"   • {mt}")
+    return "\n".join(lines)
 
 def build_olt_page_keyboard(
     splitters_order: list[str],
@@ -379,6 +614,10 @@ def format_extra_olt_summary(olt_name: str) -> str:
         s for s in splitters_list
         if kw in f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
     ]
+    matched_muftalar = [
+        m for m in muftalar_list
+        if kw in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
+    ]
 
     lines = [f"🏢 <b>OLT: {olt_name}</b>"]
     if matched_ports:
@@ -396,7 +635,12 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"📍 <b>{s['town']}</b> — <b>{s['number']}</b> ({s['splitter']} / {s['model']})\n"
                 f"   🏠 Манзил: {s['address']} | S/N: <code>{s['real_sn']}</code>"
             )
-    if not matched_ports and not matched_splitters:
+    if matched_muftalar:
+        lines.append(f"\n🧵 Муфталар базасида топилди: <b>{len(matched_muftalar)} та</b>\n")
+        for m in matched_muftalar[:3]:
+            lines.append(f"   • <b>{m['title']}</b> — {', '.join(m['addresses'][:2])}")
+
+    if not matched_ports and not matched_splitters and not matched_muftalar:
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -425,6 +669,7 @@ async def stats_handler(message: Message) -> None:
         f"🔌 Tayanch OLT: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт (Банд: {t_busy} та)\n"
         f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
         f"📡 TOMA OLT: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт (Банд: {m_busy} та)\n"
+        f"🧵 Муфта паспортлари: {len(muftalar_list)} та\n"
         f"🏢 Қўшимча OLT тугмалари: {len(EXTRA_OLT_NAMES)} та\n"
         f"👥 Хонқа абонентлари: {len(subscribers_list)} та",
         parse_mode=ParseMode.HTML
@@ -449,7 +694,7 @@ async def text_handler(message: Message) -> None:
                 parse_mode=ParseMode.HTML
             )
         elif text == "🔍 Абонент ва сплиттер қидириш":
-            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>2/16/4</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
+            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, муфта манзили, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>2/16/4</code>, <code>Shodiyona</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
         elif text == "🔌 Tayanch OLT":
             if not tayanch_splitters_order:
                 await message.answer("❌ Tayanch OLT базаси бўш ёки файл топилмади.")
@@ -477,6 +722,16 @@ async def text_handler(message: Message) -> None:
                 reply_markup=build_olt_page_keyboard(
                     toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA"], "molt", 0
                 ),
+                parse_mode=ParseMode.HTML
+            )
+        elif text == "🧵 Muftalar":
+            if not muftalar_list:
+                await message.answer("❌ Муфталар базаси топилмади.")
+                return
+            await message.answer(
+                f"🧵 <b>Оптик муфта паспортлари</b> (Жами: {len(muftalar_list)} та)\n"
+                f"Керакли муфтани танланг:",
+                reply_markup=build_muftalar_keyboard(),
                 parse_mode=ParseMode.HTML
             )
         elif text in EXTRA_OLT_BUTTON_MAP:
@@ -518,8 +773,15 @@ async def text_handler(message: Message) -> None:
                 if all(kw in combined_text for kw in keywords):
                     found_splitters.append(s)
 
+            # 4. Муфталарни қидириш
+            found_muftalar = []
+            for m in muftalar_list:
+                combined_m = f"{m['title']} {' '.join(m['sheets'])} {' '.join(m['addresses'])} {' '.join(m['cables'])} {' '.join(m['meta'])}".lower()
+                if all(kw in combined_m for kw in keywords):
+                    found_muftalar.append(m)
+
             # Натижаларни чиқариш
-            if found_subs or found_olt_ports or found_splitters:
+            if found_subs or found_olt_ports or found_splitters or found_muftalar:
                 response = ""
                 
                 if found_subs:
@@ -568,10 +830,15 @@ async def text_handler(message: Message) -> None:
                             f"🔢 <b>S/N:</b> {item['real_sn']}\n"
                             f"-----------------------------------\n"
                         )
+
+                if found_muftalar:
+                    response += f"🧵 <b>Муфталар (Жами: {len(found_muftalar)} та):</b>\n\n"
+                    for m in found_muftalar[:3]:
+                        response += format_mufta_card(m) + "\n-----------------------------------\n"
                 
                 await message.answer(response, parse_mode=ParseMode.HTML)
             else:
-                await message.answer("❌ Бундай абонент ёки сплиттер топилмади. Қайтадан текшириб ёзинг.")
+                await message.answer("❌ Бундай абонент, сплиттер ёки муфта топилмади. Қайтадан текшириб ёзинг.")
     else:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
@@ -666,6 +933,27 @@ async def callback_handler(callback: CallbackQuery) -> None:
             await callback.message.edit_text(ports_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
         else:
             await callback.answer("Сплиттер топилмади.", show_alert=True)
+            return
+        await callback.answer()
+
+    elif data_id == "mufta_back":
+        await callback.message.edit_text(
+            f"🧵 <b>Оптик муфта паспортлари</b> (Жами: {len(muftalar_list)} та)\n"
+            f"Керакли муфтани танланг:",
+            reply_markup=build_muftalar_keyboard(),
+            parse_mode=ParseMode.HTML
+        )
+        await callback.answer()
+    elif data_id.startswith("mufta_"):
+        m_idx = int(data_id.replace("mufta_", ""))
+        if 0 <= m_idx < len(muftalar_list):
+            card_text = format_mufta_card(muftalar_list[m_idx])
+            back_kb = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="⬅️ Муфталарга қайтиш", callback_data="mufta_back")]]
+            )
+            await callback.message.edit_text(card_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
+        else:
+            await callback.answer("Муфта топилмади.", show_alert=True)
             return
         await callback.answer()
 
