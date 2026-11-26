@@ -5,7 +5,7 @@ import os
 import sys
 import pandas as pd
 from aiohttp import web
-from aiogram import Bot, Dispatcher, html
+from aiogram import Bot, Dispatcher, F, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
@@ -30,11 +30,11 @@ authorized_users = set()
 EXCEL_SPLITTERS = "2.3.1.6_Оборудование_сетей_ШПД_10.11.2026_12h12m40s.xlsx"
 EXCEL_SUBSCRIBERS = "Xonqa.xlsx"
 EXCEL_OLT_CANDIDATES = [
+    "Tayanch OLT.xlsx",
     "Tayanch OLT_5.xlsx",
     "Tayanch OLT_4.xlsx",
     "Tayanch OLT_3.xlsx",
     "Tayanch OLT_2.xlsx",
-    "Tayanch OLT.xlsx"
 ]
 
 MUFTA_FILES = [
@@ -69,7 +69,7 @@ EXTRA_OLT_NAMES = [
     "Пахтагул",
 ]
 
-# Код ичидаги тайёр муфталар базаси (Excel файллар юкланмаса ҳам ишлайди)
+# Код ичидаги тайёр муфталар базаси (қидирув ва OLT маълумотлари учун)
 DEFAULT_MUFTALAR_LIST = [
     {
         "title": "Shodiyona ko'chasi Mufta",
@@ -229,6 +229,7 @@ toma_olt_list = []
 toma_splitters_order = []
 toma_by_splitter = {}
 
+
 def clean_phone(val) -> str:
     if pd.isna(val):
         return "-"
@@ -240,11 +241,13 @@ def clean_phone(val) -> str:
     except (ValueError, TypeError):
         return s
 
+
 def short_splitter_label(full_name: str, prefixes: list[str]) -> str:
     cleaned = full_name
     for p in prefixes:
         cleaned = cleaned.replace(p, "").strip()
     return cleaned if cleaned else full_name
+
 
 def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[list[dict], list[str], dict[str, list[dict]], str]:
     df_sheet = df_sheet.copy()
@@ -333,6 +336,7 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
 
     return ports_out, order_out, by_sp_out, detected_montyor
 
+
 def parse_mufta_workbook(fpath: str) -> dict | None:
     try:
         xls = pd.ExcelFile(fpath)
@@ -372,6 +376,7 @@ def parse_mufta_workbook(fpath: str) -> dict | None:
         print(f"❌ Муфта файлини ўқишда хатолик ({fpath}): {e}")
         return None
 
+
 # 1. Сплиттерлар базасини ўқиш
 try:
     if os.path.exists(EXCEL_SPLITTERS):
@@ -384,7 +389,7 @@ try:
                 address = str(row.iloc[25] if len(row) > 25 else '').strip()
                 town = str(row.iloc[31] if len(row) > 31 else '').strip()
                 real_sn = str(row.iloc[35] if len(row) > 35 else '').strip()
-                
+
                 if num and num != 'nan':
                     splitters_list.append({
                         "number": num,
@@ -452,7 +457,7 @@ try:
 except Exception as e:
     print(f"❌ OLT файлини ўқишда хатолик: {e}")
 
-# 4. Муфталар базасини юклаш (файллар мавжуд бўлса ўқийди, бўлмаса захира рўйхатни олади)
+# 4. Муфталар базасини юклаш (қидирув учун сақланади)
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
 if existing_mufta_files:
     for mf in existing_mufta_files:
@@ -486,6 +491,7 @@ ELECTRICIANS_DATA = {
     "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Хонқа тумани, Олмазор МФЙ", "task": "Электр ва оптик тармоқларда профилактика ишлари."},
 }
 
+
 def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [
@@ -497,7 +503,6 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
             KeyboardButton(text="📡 TOMA")
         ],
         [
-            KeyboardButton(text="🧵 Muftalar"),
             KeyboardButton(text="👷 Электрамонтёрлар")
         ]
     ]
@@ -508,33 +513,17 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
         rows.append(pair)
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
-keyboard = build_main_keyboard()
 
+keyboard = build_main_keyboard()
 EXTRA_OLT_BUTTON_MAP = {f"🏢 OLT {name}": name for name in EXTRA_OLT_NAMES}
 
-def build_muftalar_keyboard() -> InlineKeyboardMarkup:
+
+def build_electricians_keyboard() -> InlineKeyboardMarkup:
     rows = []
-    for idx, m in enumerate(muftalar_list):
-        rows.append([InlineKeyboardButton(text=f"🧵 {m['title']}", callback_data=f"mufta_{idx}")])
+    for key, info in ELECTRICIANS_DATA.items():
+        rows.append([InlineKeyboardButton(text=f"👷 {info['name']}", callback_data=key)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-def format_mufta_card(m: dict) -> str:
-    lines = [f"🧵 <b>{m['title']}</b>"]
-    if m.get("sheets"):
-        lines.append(f"📑 Варақлар: <i>{', '.join(m['sheets'])}</i>")
-    if m.get("addresses"):
-        lines.append("\n📍 <b>Манзиллар (кирувчи/чиқувчи):</b>")
-        for adr in m["addresses"]:
-            lines.append(f"   • {adr}")
-    if m.get("cables"):
-        lines.append("\n🔌 <b>Кабель маркалари:</b>")
-        for cb in m["cables"]:
-            lines.append(f"   • <code>{cb}</code>")
-    if m.get("meta"):
-        lines.append("\n📋 <b>Паспорт маълумоти:</b>")
-        for mt in m["meta"]:
-            lines.append(f"   • {mt}")
-    return "\n".join(lines)
 
 def build_olt_page_keyboard(
     splitters_order: list[str],
@@ -575,6 +564,7 @@ def build_olt_page_keyboard(
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
+
 def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[dict]], montyor: str = "") -> str:
     ports = by_splitter.get(splitter_name, [])
     busy_cnt = sum(1 for p in ports if p["client"] != "Бўш порт")
@@ -603,6 +593,7 @@ def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[d
             )
 
     return "\n".join(lines)
+
 
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
@@ -645,6 +636,82 @@ def format_extra_olt_summary(olt_name: str) -> str:
 
     return "\n".join(lines)
 
+
+def search_all_databases(query: str) -> str:
+    q = query.lower().strip()
+    if len(q) < 2:
+        return "⚠️ Қидирув учун камида 2 та белги киритинг."
+
+    # 1. Tayanch ва TOMA OLT портларидан қидириш
+    olt_hits = [
+        p for p in (tayanch_olt_list + toma_olt_list)
+        if q in f"{p['splitter']} {p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']}".lower()
+    ]
+
+    # 2. Абонентлар базасидан қидириш
+    sub_hits = [
+        s for s in subscribers_list
+        if q in f"{s['client']} {s['login']} {s['phone']} {s['msisdn']} {s['address']}".lower()
+    ]
+
+    # 3. Умумий сплиттерлар базасидан қидириш
+    sp_hits = [
+        sp for sp in splitters_list
+        if q in f"{sp['number']} {sp['splitter']} {sp['model']} {sp['address']} {sp['town']} {sp['real_sn']}".lower()
+    ]
+
+    # 4. Муфталардан қидириш
+    mufta_hits = [
+        m for m in muftalar_list
+        if q in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
+    ]
+
+    if not olt_hits and not sub_hits and not sp_hits and not mufta_hits:
+        return f"❌ <b>«{html.quote(query)}»</b> бўйича ҳеч нарса топилмади."
+
+    out = [f"🔎 <b>Қидирув натижалари («{html.quote(query)}»):</b>"]
+
+    if olt_hits:
+        out.append(f"\n🔌 <b>OLT портларида ({len(olt_hits)} та):</b>")
+        for p in olt_hits[:10]:
+            extra = []
+            if p["ip_phone"] != "-":
+                extra.append(f"IP-тел: {p['ip_phone']}")
+            if p["ip"] != "-":
+                extra.append(f"IP: <code>{p['ip']}</code>")
+            extra_str = f" | {' | '.join(extra)}" if extra else ""
+            out.append(
+                f"• <b>{p['splitter']}</b> ({p['port']}-порт) — <b>{p['client']}</b>\n"
+                f"  🔑 <code>{p['login']}</code> | 📞 {p['phone']}{extra_str}\n"
+                f"  🏠 {p['address']}"
+            )
+
+    if sub_hits:
+        out.append(f"\n👥 <b>Абонентлар базасида ({len(sub_hits)} та):</b>")
+        for s in sub_hits[:6]:
+            out.append(
+                f"• <b>{s['client']}</b> (<code>{s['login']}</code>)\n"
+                f"  📞 {s['phone']} | Тариф: {s['rate_plan']} | Баланс: {s['balance']}\n"
+                f"  🏠 {s['address']}"
+            )
+
+    if sp_hits:
+        out.append(f"\n⚡ <b>Сплиттерлар базасида ({len(sp_hits)} та):</b>")
+        for sp in sp_hits[:5]:
+            out.append(
+                f"• <b>{sp['number']}</b> ({sp['splitter']} / {sp['model']})\n"
+                f"  📍 {sp['town']}, {sp['address']} | S/N: <code>{sp['real_sn']}</code>"
+            )
+
+    if mufta_hits:
+        out.append(f"\n🧵 <b>Муфталарда ({len(mufta_hits)} та):</b>")
+        for m in mufta_hits[:4]:
+            out.append(f"• <b>{m['title']}</b> — {', '.join(m['addresses'][:2])}")
+
+    text_res = "\n".join(out)
+    return text_res[:4000] if len(text_res) > 4000 else text_res
+
+
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     if message.from_user.id == ADMIN_ID or message.from_user.id in authorized_users:
@@ -656,6 +723,7 @@ async def command_start_handler(message: Message) -> None:
         )
     else:
         await message.answer("🔐 Ассалому алайкум! Ботдан фойдаланиш учун махфий паролни киритинг:")
+
 
 @dp.message(Command("stats"))
 async def stats_handler(message: Message) -> None:
@@ -669,11 +737,10 @@ async def stats_handler(message: Message) -> None:
         f"🔌 Tayanch OLT: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт (Банд: {t_busy} та)\n"
         f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
         f"📡 TOMA OLT: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт (Банд: {m_busy} та)\n"
-        f"🧵 Муфта паспортлари: {len(muftalar_list)} та\n"
         f"🏢 Қўшимча OLT тугмалари: {len(EXTRA_OLT_NAMES)} та\n"
-        f"👥 Хонқа абонентлари: {len(subscribers_list)} та",
-        parse_mode=ParseMode.HTML
+        f"👥 Хонқа абонентлари: {len(subscribers_list)} та"
     )
+
 
 @dp.message()
 async def text_handler(message: Message) -> None:
@@ -682,305 +749,192 @@ async def text_handler(message: Message) -> None:
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if user_id == ADMIN_ID or user_id in authorized_users:
-        if text == "🌐 Интернет тарифлари":
-            await message.answer(
-                "<b>UZTELECOM Home Интернет тарифлари (Ҳаммаси бирга):</b>\n\n"
-                "🔥 <b>Ҳаммаси бирга 4</b> (500 Мбит/с) - 500 000 сўм/ой\n"
-                "🔥 <b>Ҳаммаси бирга 3+</b> (350 Мбит/с) - 350 000 сўм/ой\n"
-                "🔥 <b>Ҳаммаси бирга 3</b> (250 Мбит/с) - 215 000 сўм/ой\n"
-                "🔥 <b>Ҳаммаси бирга 2+</b> (150 Мбит/с) - 175 000 сўм/ой\n\n"
-                "📞 Масъул: +998995603937",
-                parse_mode=ParseMode.HTML
-            )
-        elif text == "🔍 Абонент ва сплиттер қидириш":
-            await message.answer("🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, муфта манзили, IP ёки сплиттер номини киритинг (масалан: <code>m1382825</code>, <code>2/16/4</code>, <code>Shodiyona</code> ёки <code>Навқирон</code>):", parse_mode=ParseMode.HTML)
-        elif text == "🔌 Tayanch OLT":
-            if not tayanch_splitters_order:
-                await message.answer("❌ Tayanch OLT базаси бўш ёки файл топилмади.")
-                return
-            t_busy = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
-            await message.answer(
-                f"🔌 <b>Tayanch OLT сплиттерлари</b>\n"
-                f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
-                f"📊 Жами: {len(tayanch_splitters_order)} та сплиттер, {t_busy}/{len(tayanch_olt_list)} порт банд\n"
-                f"Керакли сплиттерни танланг:",
-                reply_markup=build_olt_page_keyboard(
-                    tayanch_splitters_order, tayanch_by_splitter, ["OLT Таянч"], "tolt", 0
-                ),
-                parse_mode=ParseMode.HTML
-            )
-        elif text == "📡 TOMA":
-            if not toma_splitters_order:
-                await message.answer("❌ TOMA OLT базаси бўш ёки файл топилмади.")
-                return
-            m_busy = sum(1 for x in toma_olt_list if x["client"] != "Бўш порт")
-            await message.answer(
-                f"📡 <b>TOMA OLT сплиттерлари</b>\n"
-                f"📊 Жами: {len(toma_splitters_order)} та сплиттер, {m_busy}/{len(toma_olt_list)} порт банд\n"
-                f"Керакли сплиттерни танланг:",
-                reply_markup=build_olt_page_keyboard(
-                    toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA"], "molt", 0
-                ),
-                parse_mode=ParseMode.HTML
-            )
-        elif text == "🧵 Muftalar":
-            if not muftalar_list:
-                await message.answer("❌ Муфталар базаси топилмади.")
-                return
-            await message.answer(
-                f"🧵 <b>Оптик муфта паспортлари</b> (Жами: {len(muftalar_list)} та)\n"
-                f"Керакли муфтани танланг:",
-                reply_markup=build_muftalar_keyboard(),
-                parse_mode=ParseMode.HTML
-            )
-        elif text in EXTRA_OLT_BUTTON_MAP:
-            olt_title = EXTRA_OLT_BUTTON_MAP[text]
-            await message.answer(format_extra_olt_summary(olt_title), parse_mode=ParseMode.HTML)
-        elif text == "👷 Электрамонтёрлар":
-            buttons = [[InlineKeyboardButton(text=f"👷 {val['name']}", callback_data=key)] for key, val in ELECTRICIANS_DATA.items()]
-            await message.answer("Хонқа туманидаги электрамонтёрлар рўйхати:", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
-        else:
-            query = text.lower().strip()
-            keywords = query.split()
-
-            # 1. Абонентларни қидириш
-            found_subs = []
-            for sub in subscribers_list:
-                log = sub['login'].lower()
-                cli = sub['client'].lower()
-                ph = sub['phone'].lower()
-                msisdn = sub['msisdn'].lower()
-                adr = sub['address'].lower()
-                if query in log or query in cli or query in ph or query in msisdn or query in adr:
-                    found_subs.append(sub)
-
-            # 2. Tayanch OLT ва TOMA OLT портларини қидириш
-            found_olt_ports = []
-            for item in (tayanch_olt_list + toma_olt_list):
-                combined_olt = (
-                    f"{item['splitter']} порт {item['port']} {item['client']} "
-                    f"{item['login']} {item['address']} {item['phone']} "
-                    f"{item['ip_phone']} {item['ip']} {item.get('montyor', '')}"
-                ).lower()
-                if all(kw in combined_olt for kw in keywords):
-                    found_olt_ports.append(item)
-
-            # 3. Сплиттерларни қидириш
-            found_splitters = []
-            for s in splitters_list:
-                combined_text = f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
-                if all(kw in combined_text for kw in keywords):
-                    found_splitters.append(s)
-
-            # 4. Муфталарни қидириш
-            found_muftalar = []
-            for m in muftalar_list:
-                combined_m = f"{m['title']} {' '.join(m['sheets'])} {' '.join(m['addresses'])} {' '.join(m['cables'])} {' '.join(m['meta'])}".lower()
-                if all(kw in combined_m for kw in keywords):
-                    found_muftalar.append(m)
-
-            # Натижаларни чиқариш
-            if found_subs or found_olt_ports or found_splitters or found_muftalar:
-                response = ""
-                
-                if found_subs:
-                    response += f"👤 <b>Абонентлар (Жами: {len(found_subs)} та):</b>\n\n"
-                    for item in found_subs[:5]:
-                        response += (
-                            f"👨‍💼 <b>Ф.И.Ш:</b> {item['client']}\n"
-                            f"🔑 <b>Логин:</b> <code>{item['login']}</code>\n"
-                            f"📞 <b>Тел:</b> {item['phone']}\n"
-                            f"📋 <b>Тариф:</b> {item['rate_plan']}\n"
-                            f"🏠 <b>Манзил:</b> {item['address']}\n"
-                            f"🟢 <b>Ҳолати:</b> {item['status']}\n"
-                            f"💰 <b>Баланс:</b> {item['balance']} сўм\n"
-                            f"-----------------------------------\n"
-                        )
-
-                if found_olt_ports:
-                    response += f"🔌 <b>OLT Портлар (Жами: {len(found_olt_ports)} та):</b>\n\n"
-                    for item in found_olt_ports[:8]:
-                        extra_info = ""
-                        if item['ip_phone'] != '-':
-                            extra_info += f"☎️ <b>IP-тел:</b> {item['ip_phone']}\n"
-                        if item['ip'] != '-':
-                            extra_info += f"🌐 <b>IP:</b> <code>{item['ip']}</code>\n"
-                        if item.get('montyor'):
-                            extra_info += f"👷 <b>Монтёр:</b> {item['montyor']}\n"
-
-                        response += (
-                            f"🏷 <b>Сплиттер:</b> {item['splitter']} (Порт: {item['port']})\n"
-                            f"👨‍💼 <b>Ф.И.Ш:</b> {item['client']}\n"
-                            f"🔑 <b>Логин:</b> <code>{item['login']}</code>\n"
-                            f"🏠 <b>Манзил:</b> {item['address']}\n"
-                            f"📞 <b>Тел:</b> {item['phone']}\n"
-                            f"{extra_info}"
-                            f"-----------------------------------\n"
-                        )
-                
-                if found_splitters:
-                    response += f"⚡ <b>Сплиттерлар (Жами: {len(found_splitters)} та):</b>\n\n"
-                    for item in found_splitters[:5]:
-                        response += (
-                            f"📍 <b>Ҳудуд:</b> {item['town']}\n"
-                            f"🏷 <b>Номи:</b> {item['number']}\n"
-                            f"⚙️ <b>Тури:</b> {item['splitter']} ({item['model']})\n"
-                            f"🏠 <b>Манзил:</b> {item['address']}\n"
-                            f"🔢 <b>S/N:</b> {item['real_sn']}\n"
-                            f"-----------------------------------\n"
-                        )
-
-                if found_muftalar:
-                    response += f"🧵 <b>Муфталар (Жами: {len(found_muftalar)} та):</b>\n\n"
-                    for m in found_muftalar[:3]:
-                        response += format_mufta_card(m) + "\n-----------------------------------\n"
-                
-                await message.answer(response, parse_mode=ParseMode.HTML)
-            else:
-                await message.answer("❌ Бундай абонент, сплиттер ёки муфта топилмади. Қайтадан текшириб ёзинг.")
-    else:
+    # Пароль текшируви
+    if user_id != ADMIN_ID and user_id not in authorized_users:
         if text == SECRET_PASSWORD:
             authorized_users.add(user_id)
-            await message.answer("✅ Парол тўғри! Хуш келибсиз. Қуйидаги менюдан фойдаланишингиз мумкин:", reply_markup=keyboard)
+            user_name = html.quote(message.from_user.first_name)
+            await message.answer(
+                f"✅ Пароль тўғри! Хуш келибсиз, {user_name}.\nКеракли бўлимни танланг:",
+                reply_markup=keyboard
+            )
         else:
-            await message.answer("❌ Нотўғри парол! Илтимос, тўғри паролни киритинг:")
-
-@dp.callback_query()
-async def callback_handler(callback: CallbackQuery) -> None:
-    user_id = callback.from_user.id
-    if user_id != ADMIN_ID and user_id not in authorized_users:
-        await callback.answer("Рухсат йўқ!", show_alert=True)
+            await message.answer("❌ Пароль нотўғри! Қайта уриниб кўринг:")
         return
 
-    data_id = callback.data
-
-    if data_id == "tolt_noop":
-        await callback.answer()
-        return
-    elif data_id.startswith("tolt_pg_"):
-        page = int(data_id.replace("tolt_pg_", ""))
-        await callback.message.edit_reply_markup(
+    if text == "🌐 Интернет тарифлари":
+        await message.answer(
+            "<b>UZTELECOM Home Интернет тарифлари (Ҳаммаси бирга):</b>\n\n"
+            "🔥 <b>Ҳаммаси бирга 4</b> (500 Мбит/с) - 500 000 сўм/ой\n"
+            "🔥 <b>Ҳаммаси бирга 3+</b> (350 Мбит/с) - 350 000 сўм/ой\n"
+            "🔥 <b>Ҳаммаси бирга 3</b> (250 Мбит/с) - 215 000 сўм/ой\n"
+            "🔥 <b>Ҳаммаси бирга 2+</b> (150 Мбит/с) - 175 000 сўм/ой\n\n"
+            "📞 Масъул: +998995603937"
+        )
+    elif text == "🔍 Абонент ва сплиттер қидириш":
+        await message.answer(
+            "🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, манзил, IP ёки сплиттер номини киритинг "
+            "(масалан: <code>m1382825</code>, <code>2/16/4</code>, <code>Shodiyona</code> ёки <code>Навқирон</code>):"
+        )
+    elif text == "🔌 Tayanch OLT":
+        if not tayanch_splitters_order:
+            await message.answer("❌ Tayanch OLT базаси бўш ёки файл топилмади.")
+            return
+        t_busy = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
+        await message.answer(
+            f"🔌 <b>Tayanch OLT сплиттерлари</b>\n"
+            f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
+            f"📊 Жами: {len(tayanch_splitters_order)} та сплиттер, {t_busy}/{len(tayanch_olt_list)} порт банд\n"
+            f"Керакли сплиттерни танланг:",
             reply_markup=build_olt_page_keyboard(
-                tayanch_splitters_order, tayanch_by_splitter, ["OLT Таянч"], "tolt", page
+                tayanch_splitters_order, tayanch_by_splitter, ["OLT Таянч"], "tolt", 0
             )
         )
-        await callback.answer()
-    elif data_id.startswith("tolt_back_"):
-        page = int(data_id.replace("tolt_back_", ""))
+    elif text == "📡 TOMA":
+        if not toma_splitters_order:
+            await message.answer("❌ TOMA OLT базаси бўш ёки файл топилмади.")
+            return
+        m_busy = sum(1 for x in toma_olt_list if x["client"] != "Бўш порт")
+        await message.answer(
+            f"📡 <b>TOMA OLT сплиттерлари</b>\n"
+            f"📊 Жами: {len(toma_splitters_order)} та сплиттер, {m_busy}/{len(toma_olt_list)} порт банд\n"
+            f"Керакли сплиттерни танланг:",
+            reply_markup=build_olt_page_keyboard(
+                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"], "molt", 0
+            )
+        )
+    elif text == "👷 Электрамонтёрлар":
+        await message.answer(
+            "👷 <b>Хонқа тумани электрамонтёрлари рўйхати:</b>\nМаълумот олиш учун ходимни танланг:",
+            reply_markup=build_electricians_keyboard()
+        )
+    elif text in EXTRA_OLT_BUTTON_MAP:
+        olt_name = EXTRA_OLT_BUTTON_MAP[text]
+        await message.answer(format_extra_olt_summary(olt_name))
+    else:
+        await message.answer(search_all_databases(text))
+
+
+# ==================== CALLBACK HANDLERS ====================
+
+@dp.callback_query(F.data.startswith("tolt_"))
+async def tayanch_olt_callback(call: CallbackQuery) -> None:
+    parts = call.data.split("_")
+    action = parts[1]
+
+    if action == "noop":
+        await call.answer()
+        return
+
+    if action == "pg":
+        page = int(parts[2])
         t_busy = sum(1 for x in tayanch_olt_list if x["client"] != "Бўш порт")
-        await callback.message.edit_text(
+        await call.message.edit_text(
             f"🔌 <b>Tayanch OLT сплиттерлари</b>\n"
             f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
             f"📊 Жами: {len(tayanch_splitters_order)} та сплиттер, {t_busy}/{len(tayanch_olt_list)} порт банд\n"
             f"Керакли сплиттерни танланг:",
             reply_markup=build_olt_page_keyboard(
                 tayanch_splitters_order, tayanch_by_splitter, ["OLT Таянч"], "tolt", page
-            ),
-            parse_mode=ParseMode.HTML
-        )
-        await callback.answer()
-    elif data_id.startswith("tolt_sp_"):
-        parts = data_id.replace("tolt_sp_", "").split("_")
-        sp_idx = int(parts[0])
-        ret_page = int(parts[1]) if len(parts) > 1 else 0
-        if 0 <= sp_idx < len(tayanch_splitters_order):
-            sp_name = tayanch_splitters_order[sp_idx]
-            ports_text = format_splitter_ports_text(sp_name, tayanch_by_splitter, tayanch_montyor)
-            back_kb = InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="⬅️ Сплиттерларга қайтиш", callback_data=f"tolt_back_{ret_page}")]]
             )
-            await callback.message.edit_text(ports_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
-        else:
-            await callback.answer("Сплиттер топилмади.", show_alert=True)
-            return
-        await callback.answer()
+        )
+        await call.answer()
 
-    elif data_id == "molt_noop":
-        await callback.answer()
+    elif action == "sp":
+        idx = int(parts[2])
+        page = int(parts[3])
+        if 0 <= idx < len(tayanch_splitters_order):
+            sp_name = tayanch_splitters_order[idx]
+            text = format_splitter_ports_text(sp_name, tayanch_by_splitter, tayanch_montyor)
+            back_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ Сплиттерлар рўйхатига қайтиш", callback_data=f"tolt_pg_{page}")]
+            ])
+            await call.message.edit_text(text[:4090], reply_markup=back_kb)
+        await call.answer()
+
+
+@dp.callback_query(F.data.startswith("molt_"))
+async def toma_olt_callback(call: CallbackQuery) -> None:
+    parts = call.data.split("_")
+    action = parts[1]
+
+    if action == "noop":
+        await call.answer()
         return
-    elif data_id.startswith("molt_pg_"):
-        page = int(data_id.replace("molt_pg_", ""))
-        await callback.message.edit_reply_markup(
-            reply_markup=build_olt_page_keyboard(
-                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA"], "molt", page
-            )
-        )
-        await callback.answer()
-    elif data_id.startswith("molt_back_"):
-        page = int(data_id.replace("molt_back_", ""))
+
+    if action == "pg":
+        page = int(parts[2])
         m_busy = sum(1 for x in toma_olt_list if x["client"] != "Бўш порт")
-        await callback.message.edit_text(
+        await call.message.edit_text(
             f"📡 <b>TOMA OLT сплиттерлари</b>\n"
             f"📊 Жами: {len(toma_splitters_order)} та сплиттер, {m_busy}/{len(toma_olt_list)} порт банд\n"
             f"Керакли сплиттерни танланг:",
             reply_markup=build_olt_page_keyboard(
-                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA"], "molt", page
-            ),
-            parse_mode=ParseMode.HTML
-        )
-        await callback.answer()
-    elif data_id.startswith("molt_sp_"):
-        parts = data_id.replace("molt_sp_", "").split("_")
-        sp_idx = int(parts[0])
-        ret_page = int(parts[1]) if len(parts) > 1 else 0
-        if 0 <= sp_idx < len(toma_splitters_order):
-            sp_name = toma_splitters_order[sp_idx]
-            ports_text = format_splitter_ports_text(sp_name, toma_by_splitter)
-            back_kb = InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="⬅️ Сплиттерларга қайтиш", callback_data=f"molt_back_{ret_page}")]]
+                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"], "molt", page
             )
-            await callback.message.edit_text(ports_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
-        else:
-            await callback.answer("Сплиттер топилмади.", show_alert=True)
-            return
-        await callback.answer()
-
-    elif data_id == "mufta_back":
-        await callback.message.edit_text(
-            f"🧵 <b>Оптик муфта паспортлари</b> (Жами: {len(muftalar_list)} та)\n"
-            f"Керакли муфтани танланг:",
-            reply_markup=build_muftalar_keyboard(),
-            parse_mode=ParseMode.HTML
         )
-        await callback.answer()
-    elif data_id.startswith("mufta_"):
-        m_idx = int(data_id.replace("mufta_", ""))
-        if 0 <= m_idx < len(muftalar_list):
-            card_text = format_mufta_card(muftalar_list[m_idx])
-            back_kb = InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="⬅️ Муфталарга қайтиш", callback_data="mufta_back")]]
-            )
-            await callback.message.edit_text(card_text, reply_markup=back_kb, parse_mode=ParseMode.HTML)
-        else:
-            await callback.answer("Муфта топилмади.", show_alert=True)
-            return
-        await callback.answer()
+        await call.answer()
 
-    elif data_id.startswith("elect_"):
-        data = ELECTRICIANS_DATA.get(data_id)
-        text = f"👷 <b>{data['name']}</b>\n📞 Тел: {data['phone']}\n📍 Зона: {data['zone']}\n🛠 Вазифа: {data['task']}" if data else "Топилмади."
-        await callback.message.answer(text, parse_mode=ParseMode.HTML)
-        await callback.answer()
+    elif action == "sp":
+        idx = int(parts[2])
+        page = int(parts[3])
+        if 0 <= idx < len(toma_splitters_order):
+            sp_name = toma_splitters_order[idx]
+            text = format_splitter_ports_text(sp_name, toma_by_splitter)
+            back_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ Сплиттерлар рўйхатига қайтиш", callback_data=f"molt_pg_{page}")]
+            ])
+            await call.message.edit_text(text[:4090], reply_markup=back_kb)
+        await call.answer()
 
-async def handle_ping(request):
-    return web.Response(text="Бот ишлаяпти!")
+
+@dp.callback_query(F.data.startswith("elect_"))
+async def electrician_callback(call: CallbackQuery) -> None:
+    if call.data == "elect_back":
+        await call.message.edit_text(
+            "👷 <b>Хонқа тумани электрамонтёрлари рўйхати:</b>\nМаълумот олиш учун ходимни танланг:",
+            reply_markup=build_electricians_keyboard()
+        )
+        await call.answer()
+        return
+
+    info = ELECTRICIANS_DATA.get(call.data)
+    if info:
+        text = (
+            f"👷 <b>{info['name']}</b>\n\n"
+            f"📞 Телефон: <code>{info['phone']}</code>\n"
+            f"📍 Ҳудуд: {info['zone']}\n"
+            f"🛠 Вазифаси: {info['task']}"
+        )
+        back_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⬅️ Рўйхатга қайтиш", callback_data="elect_back")]
+        ])
+        await call.message.edit_text(text, reply_markup=back_kb)
+    await call.answer()
+
+
+# ==================== HEALTHCHECK & MAIN ====================
+
+async def healthcheck(request):
+    return web.Response(text="Bot is running!")
+
 
 async def start_web_server():
     app = web.Application()
-    app.router.add_get("/", handle_ping)
+    app.router.add_get("/", healthcheck)
     runner = web.AppRunner(app)
     await runner.setup()
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
+
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     await start_web_server()
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
