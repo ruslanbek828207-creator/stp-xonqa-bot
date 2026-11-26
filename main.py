@@ -36,6 +36,7 @@ EXCEL_OLT_CANDIDATES = [
     "Tayanch OLT_3.xlsx",
     "Tayanch OLT_2.xlsx",
 ]
+EXCEL_TOMA_EQUIPMENT = "Toma OLT.xlsx"
 
 MUFTA_FILES = [
     "Shodiyona ko’chasi Mufta.xlsx",
@@ -228,6 +229,8 @@ tayanch_montyor = "ELEKTRAMANTYORI JUMANIYAZOV RUSLAN"
 toma_olt_list = []
 toma_splitters_order = []
 toma_by_splitter = {}
+toma_equipment_list = []
+toma_eq_by_code = {}
 
 
 def clean_phone(val) -> str:
@@ -247,6 +250,11 @@ def short_splitter_label(full_name: str, prefixes: list[str]) -> str:
     for p in prefixes:
         cleaned = cleaned.replace(p, "").strip()
     return cleaned if cleaned else full_name
+
+
+def normalize_port_code(val: str) -> str:
+    tokens = str(val).replace("\xa0", " ").split()
+    return tokens[0] if tokens else str(val).strip()
 
 
 def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[list[dict], list[str], dict[str, list[dict]], str]:
@@ -453,9 +461,38 @@ try:
             toma_olt_list, toma_splitters_order, toma_by_splitter, _ = parse_olt_sheet(
                 df_m_raw, default_montyor=""
             )
-            print(f"✅ TOMA OLT юкланди: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт")
+            print(f"✅ TOMA OLT портлари юкланди: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт")
 except Exception as e:
     print(f"❌ OLT файлини ўқишда хатолик: {e}")
+
+# 3b. Toma OLT.xlsx ускуналар/сплиттерлар рўйхатини ўқиш
+try:
+    if os.path.exists(EXCEL_TOMA_EQUIPMENT):
+        xls_teq = pd.ExcelFile(EXCEL_TOMA_EQUIPMENT)
+        for s_name in xls_teq.sheet_names:
+            df_teq = pd.read_excel(EXCEL_TOMA_EQUIPMENT, sheet_name=s_name)
+            for _, row in df_teq.iterrows():
+                set_name = " ".join(str(row.get("Set", "") or "").replace("\xa0", " ").split())
+                eq_num = " ".join(str(row.get("Nomer oborud.", "") or "").replace("\xa0", " ").split())
+                addr = " ".join(str(row.get("Adres ustanovki", "") or "").replace("\xa0", " ").split())
+                serial = " ".join(str(row.get("Seriyniy nomer", "") or "").replace("\xa0", " ").split())
+
+                if eq_num and eq_num.lower() != "nan":
+                    item = {
+                        "set": set_name if set_name and set_name.lower() != "nan" else "OLT (Tomo)",
+                        "number": eq_num,
+                        "port_code": normalize_port_code(eq_num),
+                        "address": addr if addr and addr.lower() != "nan" else "-",
+                        "serial": serial if serial and serial.lower() != "nan" else "-"
+                    }
+                    toma_equipment_list.append(item)
+                    toma_eq_by_code.setdefault(item["port_code"], []).append(item)
+
+                    if item["number"] not in toma_splitters_order:
+                        toma_splitters_order.append(item["number"])
+        print(f"✅ Toma OLT.xlsx юкланди: {len(toma_equipment_list)} та ускуна/сплиттер")
+except Exception as e:
+    print(f"❌ Toma OLT.xlsx файлини ўқишда хатолик: {e}")
 
 # 4. Муфталар базасини юклаш (қидирув учун сақланади)
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
@@ -531,7 +568,8 @@ def build_olt_page_keyboard(
     prefixes: list[str],
     cb_prefix: str,
     page: int,
-    page_size: int = 20
+    page_size: int = 20,
+    eq_by_code: dict[str, list[dict]] | None = None
 ) -> InlineKeyboardMarkup:
     total_items = len(splitters_order)
     total_pages = max(1, math.ceil(total_items / page_size))
@@ -544,10 +582,20 @@ def build_olt_page_keyboard(
     row = []
     for idx in range(start_idx, end_idx):
         sp_name = splitters_order[idx]
-        ports_cnt = len(by_splitter.get(sp_name, []))
-        busy_cnt = sum(1 for p in by_splitter.get(sp_name, []) if p["client"] != "Бўш порт")
-        label = f"{short_splitter_label(sp_name, prefixes)} ({busy_cnt}/{ports_cnt})"
-        row.append(InlineKeyboardButton(text=label, callback_data=f"{cb_prefix}_sp_{idx}_{page}"))
+        short_lbl = short_splitter_label(sp_name, prefixes)
+        ports = by_splitter.get(sp_name, [])
+        if ports:
+            ports_cnt = len(ports)
+            busy_cnt = sum(1 for p in ports if p["client"] != "Бўш порт")
+            label = f"{short_lbl} ({busy_cnt}/{ports_cnt})"
+        elif eq_by_code:
+            code = normalize_port_code(sp_name)
+            eq_cnt = len(eq_by_code.get(code, []))
+            label = f"{short_lbl}" if eq_cnt <= 1 else f"{short_lbl} ({eq_cnt})"
+        else:
+            label = short_lbl
+
+        row.append(InlineKeyboardButton(text=label[:32], callback_data=f"{cb_prefix}_sp_{idx}_{page}"))
         if len(row) == 2:
             rows.append(row)
             row = []
@@ -595,11 +643,53 @@ def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[d
     return "\n".join(lines)
 
 
+def format_toma_item_text(item_label: str) -> str:
+    code = normalize_port_code(item_label)
+    eq_matches = [
+        e for e in toma_equipment_list
+        if e["number"] == item_label or e["port_code"] == code
+    ]
+    matched_sp_key = next((k for k in toma_by_splitter if normalize_port_code(k) == code), None)
+    ports = toma_by_splitter.get(matched_sp_key, []) if matched_sp_key else []
+
+    lines = [f"📡 <b>TOMA: {html.quote(item_label)}</b>"]
+    if eq_matches:
+        lines.append(f"🛠 Ускуна/сплиттер маълумоти ({len(eq_matches)} та):")
+        for e in eq_matches:
+            lines.append(
+                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
+                f"  🔢 S/N: <code>{html.quote(e['serial'])}</code>\n"
+                f"  🏠 Манзил: {html.quote(e['address'])}"
+            )
+
+    if ports:
+        busy_cnt = sum(1 for p in ports if p["client"] != "Бўш порт")
+        free_cnt = len(ports) - busy_cnt
+        lines.append(f"\n🔌 Портлар ({html.quote(matched_sp_key)}): <b>{busy_cnt} банд</b> / <b>{free_cnt} бўш</b>\n")
+        for p in ports:
+            if p["client"] == "Бўш порт":
+                lines.append(f"<b>{p['port']}-порт:</b> ⚪ <i>Бўш порт</i>")
+            else:
+                lines.append(
+                    f"<b>{p['port']}-порт:</b> 🟢 <b>{html.quote(p['client'])}</b>\n"
+                    f"   🔑 Логин: <code>{html.quote(p['login'])}</code> | 📞 Тел: {html.quote(p['phone'])}\n"
+                    f"   🏠 Манзил: {html.quote(p['address'])}"
+                )
+    elif not eq_matches:
+        lines.append("ℹ️ Маълумот топилмади.")
+
+    return "\n".join(lines)
+
+
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
         p for p in (tayanch_olt_list + toma_olt_list)
         if kw in f"{p['splitter']} {p['client']} {p['login']} {p['address']}".lower()
+    ]
+    matched_toma_eq = [
+        e for e in toma_equipment_list
+        if kw in f"{e['set']} {e['number']} {e['address']} {e['serial']}".lower()
     ]
     matched_splitters = [
         s for s in splitters_list
@@ -619,6 +709,12 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"   🔑 Логин: <code>{item['login']}</code> | 📞 Тел: {item['phone']}\n"
                 f"   🏠 Манзил: {item['address']}"
             )
+    if matched_toma_eq:
+        lines.append(f"\n📡 Toma OLT ускуналарида топилди: <b>{len(matched_toma_eq)} та</b>\n")
+        for e in matched_toma_eq[:6]:
+            lines.append(
+                f"• <b>{e['number']}</b> — {e['address']} | S/N: <code>{e['serial']}</code>"
+            )
     if matched_splitters:
         lines.append(f"\n⚡ Сплиттерлар базасида топилди: <b>{len(matched_splitters)} та</b>\n")
         for s in matched_splitters[:5]:
@@ -631,7 +727,7 @@ def format_extra_olt_summary(olt_name: str) -> str:
         for m in matched_muftalar[:3]:
             lines.append(f"   • <b>{m['title']}</b> — {', '.join(m['addresses'][:2])}")
 
-    if not matched_ports and not matched_splitters and not matched_muftalar:
+    if not matched_ports and not matched_toma_eq and not matched_splitters and not matched_muftalar:
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -646,6 +742,12 @@ def search_all_databases(query: str) -> str:
     olt_hits = [
         p for p in (tayanch_olt_list + toma_olt_list)
         if q in f"{p['splitter']} {p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']}".lower()
+    ]
+
+    # 1b. Toma OLT.xlsx ускуналаридан қидириш
+    toma_eq_hits = [
+        e for e in toma_equipment_list
+        if q in f"{e['set']} {e['number']} {e['address']} {e['serial']}".lower()
     ]
 
     # 2. Абонентлар базасидан қидириш
@@ -666,14 +768,14 @@ def search_all_databases(query: str) -> str:
         if q in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
     ]
 
-    if not olt_hits and not sub_hits and not sp_hits and not mufta_hits:
+    if not olt_hits and not toma_eq_hits and not sub_hits and not sp_hits and not mufta_hits:
         return f"❌ <b>«{html.quote(query)}»</b> бўйича ҳеч нарса топилмади."
 
     out = [f"🔎 <b>Қидирув натижалари («{html.quote(query)}»):</b>"]
 
     if olt_hits:
         out.append(f"\n🔌 <b>OLT портларида ({len(olt_hits)} та):</b>")
-        for p in olt_hits[:10]:
+        for p in olt_hits[:8]:
             extra = []
             if p["ip_phone"] != "-":
                 extra.append(f"IP-тел: {p['ip_phone']}")
@@ -684,6 +786,14 @@ def search_all_databases(query: str) -> str:
                 f"• <b>{p['splitter']}</b> ({p['port']}-порт) — <b>{p['client']}</b>\n"
                 f"  🔑 <code>{p['login']}</code> | 📞 {p['phone']}{extra_str}\n"
                 f"  🏠 {p['address']}"
+            )
+
+    if toma_eq_hits:
+        out.append(f"\n📡 <b>TOMA ускуналарида ({len(toma_eq_hits)} та):</b>")
+        for e in toma_eq_hits[:8]:
+            out.append(
+                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
+                f"  🔢 S/N: <code>{html.quote(e['serial'])}</code> | 🏠 {html.quote(e['address'])}"
             )
 
     if sub_hits:
@@ -736,7 +846,7 @@ async def stats_handler(message: Message) -> None:
         f"📦 Сплиттерлар: {len(splitters_list)} та\n"
         f"🔌 Tayanch OLT: {len(tayanch_splitters_order)} та сплиттер, {len(tayanch_olt_list)} та порт (Банд: {t_busy} та)\n"
         f"👷 Участка монтёри: <b>{tayanch_montyor}</b>\n"
-        f"📡 TOMA OLT: {len(toma_splitters_order)} та сплиттер, {len(toma_olt_list)} та порт (Банд: {m_busy} та)\n"
+        f"📡 TOMA OLT: {len(toma_splitters_order)} та позиция, {len(toma_equipment_list)} та ускуна, {len(toma_olt_list)} та порт (Банд: {m_busy} та)\n"
         f"🏢 Қўшимча OLT тугмалари: {len(EXTRA_OLT_NAMES)} та\n"
         f"👥 Хонқа абонентлари: {len(subscribers_list)} та"
     )
@@ -773,8 +883,8 @@ async def text_handler(message: Message) -> None:
         )
     elif text == "🔍 Абонент ва сплиттер қидириш":
         await message.answer(
-            "🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, манзил, IP ёки сплиттер номини киритинг "
-            "(масалан: <code>m1382825</code>, <code>2/16/4</code>, <code>Shodiyona</code> ёки <code>Навқирон</code>):"
+            "🔍 Қидирмоқчи бўлган абонент логини, Ф.И.Ш., телефон рақами, манзил, S/N, IP ёки сплиттер номини киритинг "
+            "(масалан: <code>m1382825</code>, <code>1/1/1 1x8</code>, <code>G20121809757</code> ёки <code>Tomadurvadik</code>):"
         )
     elif text == "🔌 Tayanch OLT":
         if not tayanch_splitters_order:
@@ -796,11 +906,16 @@ async def text_handler(message: Message) -> None:
             return
         m_busy = sum(1 for x in toma_olt_list if x["client"] != "Бўш порт")
         await message.answer(
-            f"📡 <b>TOMA OLT сплиттерлари</b>\n"
-            f"📊 Жами: {len(toma_splitters_order)} та сплиттер, {m_busy}/{len(toma_olt_list)} порт банд\n"
+            f"📡 <b>TOMA OLT сплиттерлари ва ускуналари</b>\n"
+            f"📊 Жами: {len(toma_splitters_order)} та позиция | Ускуналар: {len(toma_equipment_list)} та | Портлар банд: {m_busy}/{len(toma_olt_list)}\n"
             f"Керакли сплиттерни танланг:",
             reply_markup=build_olt_page_keyboard(
-                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"], "molt", 0
+                toma_splitters_order,
+                toma_by_splitter,
+                ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"],
+                "molt",
+                0,
+                eq_by_code=toma_eq_by_code
             )
         )
     elif text == "👷 Электрамонтёрлар":
@@ -866,11 +981,16 @@ async def toma_olt_callback(call: CallbackQuery) -> None:
         page = int(parts[2])
         m_busy = sum(1 for x in toma_olt_list if x["client"] != "Бўш порт")
         await call.message.edit_text(
-            f"📡 <b>TOMA OLT сплиттерлари</b>\n"
-            f"📊 Жами: {len(toma_splitters_order)} та сплиттер, {m_busy}/{len(toma_olt_list)} порт банд\n"
+            f"📡 <b>TOMA OLT сплиттерлари ва ускуналари</b>\n"
+            f"📊 Жами: {len(toma_splitters_order)} та позиция | Ускуналар: {len(toma_equipment_list)} та | Портлар банд: {m_busy}/{len(toma_olt_list)}\n"
             f"Керакли сплиттерни танланг:",
             reply_markup=build_olt_page_keyboard(
-                toma_splitters_order, toma_by_splitter, ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"], "molt", page
+                toma_splitters_order,
+                toma_by_splitter,
+                ["OLT ТOMA", "OLT TOMA", "OLT ТОМА"],
+                "molt",
+                page,
+                eq_by_code=toma_eq_by_code
             )
         )
         await call.answer()
@@ -880,7 +1000,7 @@ async def toma_olt_callback(call: CallbackQuery) -> None:
         page = int(parts[3])
         if 0 <= idx < len(toma_splitters_order):
             sp_name = toma_splitters_order[idx]
-            text = format_splitter_ports_text(sp_name, toma_by_splitter)
+            text = format_toma_item_text(sp_name)
             back_kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="⬅️ Сплиттерлар рўйхатига қайтиш", callback_data=f"molt_pg_{page}")]
             ])
