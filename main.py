@@ -51,7 +51,10 @@ EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
 ]
 EXCEL_MARKAZ2 = "Markaz 2.xlsx"
 EXCEL_DURVADIK = "Durvadik.xlsx"
-EXCEL_PAXTAKOR = "OLT Paxtakor.xlsx"
+EXCEL_PAXTAKOR_CANDIDATES = [
+    "OLT Paxtakor_2.xlsx",
+    "OLT Paxtakor.xlsx",
+]
 
 # Qo‘shimcha OLT ro‘yxati (tugmalar uchun)
 EXTRA_OLT_NAMES = [
@@ -114,6 +117,7 @@ durvadik_montyor = "Ruslan Jumaniyazov"
 
 # OLT Paxtakor ma'lumotlari va montyori
 paxtakor_list = []
+paxtakor_source_file = EXCEL_PAXTAKOR_CANDIDATES[0]
 paxtakor_montyor = "Bobojonov Iskandar"
 
 
@@ -523,12 +527,14 @@ try:
 except Exception as e:
     print(f"❌ Durvadik.xlsx файлини ўқишда хатолик: {e}")
 
-# 3h. OLT Paxtakor.xlsx ma'lumotlarini o'qish
+# 3h. OLT Paxtakor_2.xlsx / OLT Paxtakor.xlsx ma'lumotlarini o'qish
 try:
-    if os.path.exists(EXCEL_PAXTAKOR):
-        xls_paxt = pd.ExcelFile(EXCEL_PAXTAKOR)
+    paxt_eq_file = next((f for f in EXCEL_PAXTAKOR_CANDIDATES if os.path.exists(f)), None)
+    if paxt_eq_file:
+        paxtakor_source_file = paxt_eq_file
+        xls_paxt = pd.ExcelFile(paxt_eq_file)
         for s_name in xls_paxt.sheet_names:
-            df_paxt = pd.read_excel(EXCEL_PAXTAKOR, sheet_name=s_name)
+            df_paxt = pd.read_excel(paxt_eq_file, sheet_name=s_name)
             for r_idx in range(df_paxt.shape[0]):
                 for c_idx in range(df_paxt.shape[1]):
                     v_cell = df_paxt.iat[r_idx, c_idx]
@@ -565,9 +571,9 @@ try:
                         "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
                         "montyor": paxtakor_montyor
                     })
-        print(f"✅ OLT Paxtakor.xlsx юкланди: {len(paxtakor_list)} та (Монтёр: {paxtakor_montyor})")
+        print(f"✅ {paxt_eq_file} юкланди: {len(paxtakor_list)} та (Монтёр: {paxtakor_montyor})")
 except Exception as e:
-    print(f"❌ OLT Paxtakor.xlsx файлини ўқишда хатолик: {e}")
+    print(f"❌ OLT Paxtakor файлини ўқишда хатолик: {e}")
 
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
@@ -1127,7 +1133,7 @@ async def cmd_stats(message: Message):
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
         f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)\n"
-        f"• OLT Пахтакор объектлар: <b>{len(paxtakor_list)} та</b> (Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
+        f"• OLT Пахтакор объектлар ({html.quote(paxtakor_source_file)}): <b>{len(paxtakor_list)} та</b> (Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
         reply_markup=keyboard
     )
 
