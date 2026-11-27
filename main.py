@@ -49,6 +49,7 @@ EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
     "Navoi_2.xlsx",
     "Navoi.xlsx",
 ]
+EXCEL_MARKAZ2 = "Markaz 2.xlsx"
 
 MUFTA_FILES = [
     "Shodiyona ko’chasi Mufta.xlsx",
@@ -258,6 +259,13 @@ navoi_equipment_list = []
 navoi_source_file = EXCEL_NAVVOI_EQUIPMENT_CANDIDATES[0]
 navoi_montyor = "ALI MASHARIPOV"
 
+# OLT Markaz 2 ma'lumotlari va montyori
+markaz2_olt_list = []
+markaz2_splitters_order = []
+markaz2_by_splitter = {}
+markaz2_scheme_list = []
+markaz2_montyor = "ALI MASHARIPOV"
+
 
 def clean_phone(val) -> str:
     if pd.isna(val):
@@ -297,6 +305,14 @@ def short_splitter_label(full_name: str, prefixes: list[str]) -> str:
 def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[list[dict], list[str], dict[str, list[dict]], str]:
     df_sheet = df_sheet.copy()
     detected_montyor = default_montyor
+
+    for col_name in df_sheet.columns:
+        c_str = " ".join(str(col_name).replace("\xa0", " ").split())
+        if "elektramantyori" in c_str.lower() or "montyor" in c_str.lower() or "mantyor" in c_str.lower():
+            continue
+        if not str(col_name).startswith("Unnamed") and len(c_str) > 3 and c_str.lower() not in ("spllikter", "splitter", "сплиттер"):
+            detected_montyor = c_str
+            break
 
     row0_col1 = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet) > 0 and len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
     if row0_col1.lower() in ("spllikter", "splitter", "сплиттер"):
@@ -621,6 +637,43 @@ try:
 except Exception as e:
     print(f"❌ Navoi файлини ўқишда хатолик: {e}")
 
+# 3f. Markaz 2.xlsx ma'lumotlarini o'qish ("Markaz 2" va "Markaz 2 splitter" varaqlari)
+try:
+    if os.path.exists(EXCEL_MARKAZ2):
+        xls_m2 = pd.ExcelFile(EXCEL_MARKAZ2)
+        m2_sheets = {name.strip(): name for name in xls_m2.sheet_names}
+
+        if "Markaz 2 splitter" in m2_sheets:
+            df_m2_sp = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2 splitter"])
+            markaz2_olt_list, markaz2_splitters_order, markaz2_by_splitter, markaz2_montyor = parse_olt_sheet(
+                df_m2_sp, default_montyor=markaz2_montyor
+            )
+            print(f"✅ Markaz 2 splitter юкланди: {len(markaz2_splitters_order)} та сплиттер, {len(markaz2_olt_list)} та порт (Монтёр: {markaz2_montyor})")
+
+        if "Markaz 2" in m2_sheets:
+            df_m2_main = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2"])
+            for _, row in df_m2_main.iterrows():
+                set_val = " ".join(str(row.get("Set", "") or "").replace("\xa0", " ").split())
+                sp_single = " ".join(str(row.get("Splitter (Bittadan)", "") or "").replace("\xa0", " ").split())
+                orks_os = " ".join(str(row.get("ORKS / OS", "") or "").replace("\xa0", " ").split())
+                sp_ur = " ".join(str(row.get("Splitter-UR", "") or "").replace("\xa0", " ").split())
+                port_1xn = " ".join(str(row.get("Port / 1xN", "") or "").replace("\xa0", " ").split())
+                addr_val = " ".join(str(row.get("Uy manzili", "") or "").replace("\xa0", " ").split())
+
+                if any(v and v.lower() != "nan" for v in (sp_single, orks_os, sp_ur, port_1xn, addr_val)):
+                    markaz2_scheme_list.append({
+                        "set": set_val if set_val and set_val.lower() != "nan" else "Markaz 2",
+                        "splitter_single": sp_single if sp_single and sp_single.lower() != "nan" else "-",
+                        "orks_os": orks_os if orks_os and orks_os.lower() != "nan" else "-",
+                        "splitter_ur": sp_ur if sp_ur and sp_ur.lower() != "nan" else "-",
+                        "port_1xn": port_1xn if port_1xn and port_1xn.lower() != "nan" else "-",
+                        "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
+                        "montyor": markaz2_montyor
+                    })
+            print(f"✅ Markaz 2 схемаси юкланди: {len(markaz2_scheme_list)} та ёзув")
+except Exception as e:
+    print(f"❌ Markaz 2.xlsx файлини ўқишда хатолик: {e}")
+
 # 4. Muftalar bazasini yuklash
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
 if existing_mufta_files:
@@ -904,7 +957,7 @@ def format_navoi_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
-        p for p in (tayanch_olt_list + toma_olt_list)
+        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list)
         if kw in f"{p['splitter']} {p['client']} {p['login']} {p['address']} {p.get('montyor', '')}".lower()
     ]
     matched_splitters = [
@@ -999,7 +1052,7 @@ def search_all_databases(query: str) -> str:
 
     # 1. OLT portlaridan faqat band abonentlar bo'yicha qidirish
     olt_hits = [
-        p for p in (tayanch_olt_list + toma_olt_list)
+        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list)
         if p["client"] != "Бўш порт"
         and q in f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']}".lower()
     ]
@@ -1085,6 +1138,7 @@ async def cmd_stats(message: Message):
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
+        f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема | Монтёр: <b>{html.quote(markaz2_montyor)}</b>)\n"
         f"• Муфталар: <b>{len(muftalar_list)} та</b>",
         reply_markup=keyboard
     )
@@ -1186,16 +1240,30 @@ async def cb_electrician_detail(callback: CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith(("tolt_", "molt_")))
+@dp.callback_query(F.data.startswith(("tolt_", "molt_", "m2olt_")))
 async def cb_olt_pagination_and_ports(callback: CallbackQuery):
     data = callback.data
-    is_tayanch = data.startswith("tolt_")
-    prefix = "tolt" if is_tayanch else "molt"
-    sp_order = tayanch_splitters_order if is_tayanch else toma_splitters_order
-    by_sp = tayanch_by_splitter if is_tayanch else toma_by_splitter
-    sp_prefixes = ["Tayanch OLT", "Tayanch"] if is_tayanch else ["TOMA OLT", "TOMA", "Tomo"]
-    montyor = tayanch_montyor if is_tayanch else toma_montyor
-    title = "Tayanch OLT" if is_tayanch else "TOMA OLT"
+    if data.startswith("tolt_"):
+        prefix = "tolt"
+        sp_order = tayanch_splitters_order
+        by_sp = tayanch_by_splitter
+        sp_prefixes = ["Tayanch OLT", "Tayanch"]
+        montyor = tayanch_montyor
+        title = "Tayanch OLT"
+    elif data.startswith("molt_"):
+        prefix = "molt"
+        sp_order = toma_splitters_order
+        by_sp = toma_by_splitter
+        sp_prefixes = ["TOMA OLT", "TOMA", "Tomo"]
+        montyor = toma_montyor
+        title = "TOMA OLT"
+    else:
+        prefix = "m2olt"
+        sp_order = markaz2_splitters_order
+        by_sp = markaz2_by_splitter
+        sp_prefixes = ["OLT Markaz 2", "Markaz 2", "Markaz"]
+        montyor = markaz2_montyor
+        title = "OLT Марказ2"
 
     if data.endswith("_noop"):
         await callback.answer()
@@ -1317,6 +1385,22 @@ async def handle_text(message: Message):
 
     if txt in EXTRA_OLT_BUTTON_MAP:
         olt_name = EXTRA_OLT_BUTTON_MAP[txt]
+        if olt_name.lower() in ("марказ2", "марказ 2", "markaz2", "markaz 2") and markaz2_splitters_order:
+            mk = build_olt_page_keyboard(
+                splitters_order=markaz2_splitters_order,
+                by_splitter=markaz2_by_splitter,
+                prefixes=["OLT Markaz 2", "Markaz 2", "Markaz"],
+                cb_prefix="m2olt",
+                page=0
+            )
+            await message.answer(
+                f"🏢 <b>OLT Марказ2</b> сплиттерлари (Жами: <b>{len(markaz2_splitters_order)} та</b>)\n"
+                f"👷 Монтёр: <b>{html.quote(markaz2_montyor)}</b>\n"
+                "Сплиттерни танланг:",
+                reply_markup=mk
+            )
+            return
+
         if olt_name.lower() in ("хонкобод", "xonkobod") and xonkobod_equipment_list:
             text, page = format_xonkobod_page_text(0)
             mk = build_xonkobod_page_keyboard(page)
