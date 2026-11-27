@@ -52,6 +52,7 @@ EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
 EXCEL_MARKAZ2 = "Markaz 2.xlsx"
 EXCEL_DURVADIK = "Durvadik.xlsx"
 EXCEL_PAXTAKOR_CANDIDATES = [
+    "OLT Paxtakor_3.xlsx",
     "OLT Paxtakor_2.xlsx",
     "OLT Paxtakor.xlsx",
 ]
@@ -117,7 +118,10 @@ durvadik_montyor = "Ruslan Jumaniyazov"
 
 # OLT Paxtakor ma'lumotlari va montyori
 paxtakor_list = []
-paxtakor_source_file = EXCEL_PAXTAKOR_CANDIDATES[0]
+paxtakor_olt_list = []
+paxtakor_splitters_order = []
+paxtakor_by_splitter = {}
+paxtakor_source_file = EXCEL_PAXTAKOR_CANDIDATES[-1]
 paxtakor_montyor = "Bobojonov Iskandar"
 
 
@@ -160,15 +164,36 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
     df_sheet = df_sheet.copy()
     detected_montyor = default_montyor
 
-    row0_col1 = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet) > 0 and len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
-    if row0_col1.lower() in ("spllikter", "splitter", "сплиттер"):
+    # Agar 0-qatorda jadval sarlavhalari ("Spllikter", "Login" va h.k.) bo'lsa
+    row0_vals = [str(x).strip().lower() for x in df_sheet.iloc[0, :7]] if len(df_sheet) > 0 else []
+    if any(k in row0_vals for k in ("spllikter", "splitter", "сплиттер", "login")):
         new_cols = list(df_sheet.columns)
-        for c_idx in range(1, min(len(new_cols), 7)):
+        for c_idx in range(min(len(new_cols), 7)):
             val_c = df_sheet.iloc[0, c_idx]
             if pd.notna(val_c) and str(val_c).strip():
                 new_cols[c_idx] = str(val_c).strip()
         df_sheet.columns = new_cols
         df_sheet = df_sheet.iloc[1:].reset_index(drop=True)
+
+    # Agar 0-qatorda silliq ko'rinishda ("OLT Paxtakor" | "1/1/1") berilgan bo'lsa
+    if len(df_sheet) > 0 and pd.isna(df_sheet.iloc[0, 0]):
+        c1_str = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
+        c2_str = str(df_sheet.iloc[0, 2]).strip() if len(df_sheet.columns) > 2 and pd.notna(df_sheet.iloc[0, 2]) else ""
+        if c2_str and c1_str.lower() in ("olt paxtakor", "paxtakor", "tayanch olt", "toma olt", "markaz 2", "марказ2"):
+            new_cols = list(df_sheet.columns)
+            if len(new_cols) > 1:
+                new_cols[1] = "Spllikter"
+            if len(new_cols) > 2:
+                new_cols[2] = "Login"
+            if len(new_cols) > 3:
+                new_cols[3] = "Manzil"
+            if len(new_cols) > 4:
+                new_cols[4] = "Telfon nomeri"
+            if len(new_cols) > 5:
+                new_cols[5] = "ip-telfon"
+            if len(new_cols) > 6:
+                new_cols[6] = "ip"
+            df_sheet.columns = new_cols
 
     df_sheet.columns = [
         str(col).strip() if not str(col).startswith("Unnamed") else str(col)
@@ -190,21 +215,32 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
 
     for _, row in df_sheet.iterrows():
         port_raw = row.get(port_col)
-        splitter_or_fio = row.get(sp_col)
-        login_val = row.get(login_col) if login_col else None
+        col1_val = row.get(sp_col)
+        col2_val = row.get(login_col) if login_col else None
         address_val = row.get(addr_col) if addr_col else None
         phone_val = row.get(phone_col) if phone_col else None
         ip_phone_val = row.get(ip_phone_col) if ip_phone_col else None
         ip_val = row.get(ip_col) if ip_col else None
 
         if pd.isna(port_raw):
-            if pd.notna(splitter_or_fio) and str(splitter_or_fio).strip():
-                current_splitter = " ".join(str(splitter_or_fio).split())
-                if current_splitter not in by_sp_out:
-                    order_out.append(current_splitter)
-                    by_sp_out[current_splitter] = []
+            c1_s = " ".join(str(col1_val).split()) if pd.notna(col1_val) and str(col1_val).strip().lower() != "nan" else ""
+            c2_s = " ".join(str(col2_val).split()) if pd.notna(col2_val) and str(col2_val).strip().lower() != "nan" else ""
+
+            # Masalan: col1 = "OLT Paxtakor", col2 = "1/1/1" yoki col1 = "Spllikter"
+            if c1_s.lower() in ("spllikter", "splitter", "сплиттер"):
+                continue
+
+            if c2_s and c1_s.lower() in ("olt paxtakor", "paxtakor", "tayanch olt", "toma olt", "markaz 2", "марказ2"):
+                current_splitter = f"{c1_s} {c2_s}".strip()
+            elif c1_s:
+                current_splitter = c1_s
             else:
                 current_splitter = None
+                continue
+
+            if current_splitter not in by_sp_out:
+                order_out.append(current_splitter)
+                by_sp_out[current_splitter] = []
             continue
 
         if not current_splitter:
@@ -215,10 +251,10 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
         except (ValueError, TypeError):
             port_num = str(port_raw).strip()
 
-        raw_fio = " ".join(str(splitter_or_fio).replace("\xa0", " ").split()) if pd.notna(splitter_or_fio) else ""
+        raw_fio = " ".join(str(col1_val).replace("\xa0", " ").split()) if pd.notna(col1_val) else ""
         fio_str = "Бўш порт" if raw_fio in ("", "\\", "nan") else raw_fio
 
-        login_str = str(login_val).strip() if pd.notna(login_val) and str(login_val).strip() not in ("", "nan") else "-"
+        login_str = str(col2_val).strip() if pd.notna(col2_val) and str(col2_val).strip() not in ("", "nan") else "-"
         addr_str = " ".join(str(address_val).replace("\xa0", " ").split()) if pd.notna(address_val) and str(address_val).strip() not in ("", "nan") else "-"
         phone_str = clean_phone(phone_val)
         ip_phone_str = clean_phone(ip_phone_val)
@@ -527,14 +563,37 @@ try:
 except Exception as e:
     print(f"❌ Durvadik.xlsx файлини ўқишда хатолик: {e}")
 
-# 3h. OLT Paxtakor_2.xlsx / OLT Paxtakor.xlsx ma'lumotlarini o'qish
+# 3h. OLT Paxtakor ma'lumotlarini o'qish ("OLT Paxtakor" va "Splitter" varaqlari)
 try:
     paxt_eq_file = next((f for f in EXCEL_PAXTAKOR_CANDIDATES if os.path.exists(f)), None)
     if paxt_eq_file:
         paxtakor_source_file = paxt_eq_file
         xls_paxt = pd.ExcelFile(paxt_eq_file)
-        for s_name in xls_paxt.sheet_names:
-            df_paxt = pd.read_excel(paxt_eq_file, sheet_name=s_name)
+        paxt_sheets = {name.strip().lower(): name for name in xls_paxt.sheet_names}
+
+        if "splitter" in paxt_sheets:
+            df_paxt_sp = pd.read_excel(paxt_eq_file, sheet_name=paxt_sheets["splitter"])
+            # Ustki qatorlarda montyor nomi bo'lsa aniqlaymiz
+            detected_paxt_montyor = paxtakor_montyor
+            for c_name in df_paxt_sp.columns:
+                c_str = " ".join(str(c_name).split())
+                if "mantyor" in c_str.lower() or "montyor" in c_str.lower() or "elektramont" in c_str.lower():
+                    parts_c = c_str.split(":", 1)
+                    detected_paxt_montyor = parts_c[1].strip() if len(parts_c) == 2 and parts_c[1].strip() else c_str
+                    break
+
+            paxtakor_olt_list, paxtakor_splitters_order, paxtakor_by_splitter, _ = parse_olt_sheet(
+                df_paxt_sp, default_montyor=detected_paxt_montyor
+            )
+            paxtakor_montyor = detected_paxt_montyor
+            print(
+                f"✅ {paxt_eq_file} [Splitter] юкланди: {len(paxtakor_splitters_order)} та сплиттер, "
+                f"{len(paxtakor_olt_list)} та порт (Монтёр: {paxtakor_montyor})"
+            )
+
+        main_sheet_key = next((k for k in paxt_sheets if k != "splitter"), None)
+        if main_sheet_key:
+            df_paxt = pd.read_excel(paxt_eq_file, sheet_name=paxt_sheets[main_sheet_key])
             for r_idx in range(df_paxt.shape[0]):
                 for c_idx in range(df_paxt.shape[1]):
                     v_cell = df_paxt.iat[r_idx, c_idx]
@@ -571,7 +630,7 @@ try:
                         "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
                         "montyor": paxtakor_montyor
                     })
-        print(f"✅ {paxt_eq_file} юкланди: {len(paxtakor_list)} та (Монтёр: {paxtakor_montyor})")
+            print(f"✅ {paxt_eq_file} [{paxt_sheets[main_sheet_key]}] юкланди: {len(paxtakor_list)} та")
 except Exception as e:
     print(f"❌ OLT Paxtakor файлини ўқишда хатолик: {e}")
 
@@ -918,7 +977,7 @@ def format_paxtakor_page_text(page: int, page_size: int = 15) -> tuple[str, int]
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
-        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list)
+        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list + paxtakor_olt_list)
         if kw in f"{p['splitter']} {p['client']} {p['login']} {p['address']} {p.get('montyor', '')}".lower()
     ]
     matched_splitters = [
@@ -1045,9 +1104,9 @@ def search_all_databases(query: str) -> str:
 
     # 1. OLT portlaridan faqat band abonentlar bo'yicha qidirish
     olt_hits = [
-        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list)
+        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list + paxtakor_olt_list)
         if p["client"] != "Бўш порт"
-        and q in f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']}".lower()
+        and q in f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']} {p['splitter']}".lower()
     ]
 
     # 2. Abonentlar bazasidan qidirish
@@ -1133,7 +1192,7 @@ async def cmd_stats(message: Message):
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
         f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)\n"
-        f"• OLT Пахтакор объектлар ({html.quote(paxtakor_source_file)}): <b>{len(paxtakor_list)} та</b> (Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
+        f"• OLT Пахтакор сплиттерлар: <b>{len(paxtakor_splitters_order)} та</b> ({len(paxtakor_olt_list)} порт, {len(paxtakor_list)} объект | {html.quote(paxtakor_source_file)} | Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
         reply_markup=keyboard
     )
 
@@ -1234,7 +1293,7 @@ async def cb_electrician_detail(callback: CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith(("tolt_", "molt_", "m2olt_")))
+@dp.callback_query(F.data.startswith(("tolt_", "molt_", "m2olt_", "pxolt_")))
 async def cb_olt_pagination_and_ports(callback: CallbackQuery):
     data = callback.data
     if data.startswith("tolt_"):
@@ -1251,13 +1310,20 @@ async def cb_olt_pagination_and_ports(callback: CallbackQuery):
         sp_prefixes = ["TOMA OLT", "TOMA", "Tomo"]
         montyor = toma_montyor
         title = "TOMA OLT"
-    else:
+    elif data.startswith("m2olt_"):
         prefix = "m2olt"
         sp_order = markaz2_splitters_order
         by_sp = markaz2_by_splitter
         sp_prefixes = ["OLT Markaz 2", "Markaz 2", "Markaz"]
         montyor = ""
         title = "OLT Марказ2"
+    else:
+        prefix = "pxolt"
+        sp_order = paxtakor_splitters_order
+        by_sp = paxtakor_by_splitter
+        sp_prefixes = ["OLT Paxtakor", "Paxtakor"]
+        montyor = paxtakor_montyor
+        title = "OLT Пахтакор"
 
     if data.endswith("_noop"):
         await callback.answer()
@@ -1440,11 +1506,27 @@ async def handle_text(message: Message):
             await message.answer(text, reply_markup=mk)
             return
 
-        if olt_name.lower() in ("пахтакор", "paxtakor") and paxtakor_list:
-            text, page = format_paxtakor_page_text(0)
-            mk = build_paxtakor_page_keyboard(page)
-            await message.answer(text, reply_markup=mk)
-            return
+        if olt_name.lower() in ("пахтакор", "paxtakor"):
+            if paxtakor_splitters_order:
+                mk = build_olt_page_keyboard(
+                    splitters_order=paxtakor_splitters_order,
+                    by_splitter=paxtakor_by_splitter,
+                    prefixes=["OLT Paxtakor", "Paxtakor"],
+                    cb_prefix="pxolt",
+                    page=0
+                )
+                await message.answer(
+                    f"🏢 <b>OLT Пахтакор</b> сплиттерлари (Жами: <b>{len(paxtakor_splitters_order)} та</b>)\n"
+                    f"👷 Монтёр: <b>{html.quote(paxtakor_montyor)}</b>\n"
+                    "Сплиттерни танланг:",
+                    reply_markup=mk
+                )
+                return
+            if paxtakor_list:
+                text, page = format_paxtakor_page_text(0)
+                mk = build_paxtakor_page_keyboard(page)
+                await message.answer(text, reply_markup=mk)
+                return
 
         if olt_name.lower() in ("хонкобод", "xonkobod") and xonkobod_equipment_list:
             text, page = format_xonkobod_page_text(0)
