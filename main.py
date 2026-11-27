@@ -40,6 +40,7 @@ EXCEL_OLT_CANDIDATES = [
 ]
 EXCEL_TOMA_EQUIPMENT = "Toma OLT.xlsx"
 EXCEL_XONKOBOD_EQUIPMENT = "OLT_Xonkobod_tayyor.xlsx"
+EXCEL_YOSH_KUCH_EQUIPMENT = "OLT Yosh kuch.xlsx"
 
 MUFTA_FILES = [
     "Shodiyona ko’chasi Mufta.xlsx",
@@ -237,6 +238,10 @@ toma_equipment_list = []
 # OLT Xonkobod uskunalari va montyori
 xonkobod_equipment_list = []
 xonkobod_montyor = "Yusupov Bobur"
+
+# OLT Yosh kuch uskunalari va montyori
+yosh_kuch_equipment_list = []
+yosh_kuch_montyor = "Yo'ldashov Qadamboy"
 
 
 def clean_phone(val) -> str:
@@ -513,6 +518,32 @@ try:
 except Exception as e:
     print(f"❌ OLT_Xonkobod_tayyor.xlsx файлини ўқишда хатолик: {e}")
 
+# 3d. OLT Yosh kuch.xlsx uskunalarini o'qish
+try:
+    if os.path.exists(EXCEL_YOSH_KUCH_EQUIPMENT):
+        xls_yk = pd.ExcelFile(EXCEL_YOSH_KUCH_EQUIPMENT)
+        for s_name in xls_yk.sheet_names:
+            df_yk = pd.read_excel(EXCEL_YOSH_KUCH_EQUIPMENT, skiprows=2, sheet_name=s_name)
+            for _, row in df_yk.iterrows():
+                set_name = " ".join(str(row.get("Set", "") or "").replace("\xa0", " ").split())
+                port_code = " ".join(str(row.get("Kod porta", "") or "").replace("\xa0", " ").split())
+                street = " ".join(str(row.get("Ko‘cha", "") or row.get("Ko'cha", "") or "").replace("\xa0", " ").split())
+                addr = " ".join(str(row.get("Adres ustanovki", "") or "").replace("\xa0", " ").split())
+
+                if set_name.upper() == "JAMI OBYEKTLAR":
+                    continue
+                if port_code and port_code.lower() != "nan":
+                    yosh_kuch_equipment_list.append({
+                        "set": set_name if set_name and set_name.lower() != "nan" else "OLT Yosh kuch",
+                        "number": port_code,
+                        "street": street if street and street.lower() != "nan" else "-",
+                        "address": addr if addr and addr.lower() != "nan" else "-",
+                        "montyor": yosh_kuch_montyor
+                    })
+        print(f"✅ OLT Yosh kuch.xlsx юкланди: {len(yosh_kuch_equipment_list)} та (Монтёр: {yosh_kuch_montyor})")
+except Exception as e:
+    print(f"❌ OLT Yosh kuch.xlsx файлини ўқишда хатолик: {e}")
+
 # 4. Muftalar bazasini yuklash
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
 if existing_mufta_files:
@@ -686,6 +717,41 @@ def format_xonkobod_page_text(page: int, page_size: int = 15) -> tuple[str, int]
     return "\n".join(lines), page
 
 
+def build_yosh_kuch_page_keyboard(page: int, page_size: int = 15) -> InlineKeyboardMarkup:
+    total_items = len(yosh_kuch_equipment_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Олдинги", callback_data=f"yk_pg_{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"📄 {page + 1}/{total_pages}", callback_data="yk_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Кейинги ➡️", callback_data=f"yk_pg_{page + 1}"))
+
+    return InlineKeyboardMarkup(inline_keyboard=[nav_row])
+
+
+def format_yosh_kuch_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
+    total_items = len(yosh_kuch_equipment_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    start_idx = page * page_size
+    end_idx = min(start_idx + page_size, total_items)
+
+    lines = [
+        f"📡 <b>OLT Yosh kuch объектлари</b> (Жами: <b>{total_items} та</b> | Саҳифа {page + 1}/{total_pages})\n"
+        f"👷 Электромонтёр: <b>{html.quote(yosh_kuch_montyor)}</b>\n"
+    ]
+    for item in yosh_kuch_equipment_list[start_idx:end_idx]:
+        lines.append(
+            f"• <b>{html.quote(item['number'])}</b> ({html.quote(item['set'])})\n"
+            f"  🏠 {html.quote(item['address'])}"
+        )
+    return "\n".join(lines), page
+
+
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
@@ -704,6 +770,11 @@ def format_extra_olt_summary(olt_name: str) -> str:
         e for e in xonkobod_equipment_list
         if kw in ("хонкобод", "xonkobod")
         or kw in f"{e['set']} {e['number']} {e['address']} {e['serial']} {e.get('montyor', '')}".lower()
+    ]
+    matched_yosh_kuch = [
+        e for e in yosh_kuch_equipment_list
+        if kw in ("ёш куч", "ёш куч", "yosh kuch", "yoshkuch")
+        or kw in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
     lines = [f"🏢 <b>OLT: {html.quote(olt_name)}</b>"]
@@ -738,7 +809,18 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"  🏠 {html.quote(e['address'])}"
             )
 
-    if not matched_ports and not matched_splitters and not matched_muftalar and not matched_xonkobod:
+    if matched_yosh_kuch and kw not in ("ёш куч", "yosh kuch", "yoshkuch"):
+        lines.append(
+            f"\n📡 <b>OLT Yosh kuch объектларида ({len(matched_yosh_kuch)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>:\n"
+        )
+        for e in matched_yosh_kuch[:8]:
+            lines.append(
+                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
+    if not matched_ports and not matched_splitters and not matched_muftalar and not matched_xonkobod and not matched_yosh_kuch:
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -779,13 +861,19 @@ def search_all_databases(query: str) -> str:
         if q in f"{e['set']} {e['number']} {e['address']} {e['serial']} {e.get('montyor', '')}".lower()
     ]
 
+    # 3d. OLT Yosh kuch.xlsx uskunalaridan qidirish
+    yosh_kuch_sp_hits = [
+        e for e in yosh_kuch_equipment_list
+        if q in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
+    ]
+
     # 4. Muftalardan qidirish
     mufta_hits = [
         m for m in muftalar_list
         if q in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
     ]
 
-    if not olt_hits and not sub_hits and not sp_hits and not toma_sp_hits and not xonkobod_sp_hits and not mufta_hits:
+    if not olt_hits and not sub_hits and not sp_hits and not toma_sp_hits and not xonkobod_sp_hits and not yosh_kuch_sp_hits and not mufta_hits:
         return f"❌ <b>«{html.quote(query)}»</b> бўйича ҳеч нарса топилмади."
 
     out = [f"🔎 <b>Қидирув натижалари («{html.quote(query)}»):</b>"]
@@ -836,6 +924,17 @@ def search_all_databases(query: str) -> str:
             f"| 👷 Монтёр: <b>{html.quote(xonkobod_montyor)}</b>:"
         )
         for e in xonkobod_sp_hits[:8]:
+            out.append(
+                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
+    if yosh_kuch_sp_hits:
+        out.append(
+            f"\n📡 <b>OLT Yosh kuch объектларида ({len(yosh_kuch_sp_hits)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>:"
+        )
+        for e in yosh_kuch_sp_hits[:8]:
             out.append(
                 f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
                 f"  🏠 {html.quote(e['address'])}"
@@ -893,6 +992,7 @@ async def cmd_stats(message: Message):
         f"• TOMA OLT сплиттерлар: <b>{len(toma_splitters_order)} та</b> ({len(toma_olt_list)} порт)\n"
         f"• Toma OLT.xlsx ёзувлар: <b>{len(toma_equipment_list)} та</b>\n"
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
+        f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• Муфталар: <b>{len(muftalar_list)} та</b>",
         reply_markup=keyboard
     )
@@ -918,7 +1018,7 @@ async def prompt_search(message: Message):
         "• Абонент Ф.И.Ш. ёки логини\n"
         "• Телефон ёки IP-манзил\n"
         "• Кўча / маҳалла / уй манзили\n"
-        "• Сплиттер ёки ускуна рақами (масалан: <code>1/1/1</code>, <code>Ona Zamin</code>)",
+        "• Сплиттер ёки ускуна рақами (масалан: <code>1/1/1</code>, <code>Sharof Rashidov</code>)",
         reply_markup=keyboard
     )
 
@@ -1063,6 +1163,26 @@ async def cb_xonkobod_pagination(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data.startswith("yk_"))
+async def cb_yosh_kuch_pagination(callback: CallbackQuery):
+    if callback.data == "yk_noop":
+        await callback.answer()
+        return
+
+    if callback.data.startswith("yk_pg_"):
+        try:
+            page = int(callback.data.split("_")[2])
+        except ValueError:
+            page = 0
+        text, current_page = format_yosh_kuch_page_text(page)
+        mk = build_yosh_kuch_page_keyboard(current_page)
+        await callback.message.edit_text(text, reply_markup=mk)
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+
 @dp.message(F.text)
 async def handle_text(message: Message):
     txt = message.text.strip()
@@ -1072,6 +1192,12 @@ async def handle_text(message: Message):
         if olt_name.lower() in ("хонкобод", "xonkobod") and xonkobod_equipment_list:
             text, page = format_xonkobod_page_text(0)
             mk = build_xonkobod_page_keyboard(page)
+            await message.answer(text, reply_markup=mk)
+            return
+
+        if olt_name.lower() in ("ёш куч", "yosh kuch", "yoshkuch") and yosh_kuch_equipment_list:
+            text, page = format_yosh_kuch_page_text(0)
+            mk = build_yosh_kuch_page_keyboard(page)
             await message.answer(text, reply_markup=mk)
             return
 
