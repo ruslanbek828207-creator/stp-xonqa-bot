@@ -164,7 +164,6 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
     df_sheet = df_sheet.copy()
     detected_montyor = default_montyor
 
-    # Agar 0-qatorda jadval sarlavhalari ("Spllikter", "Login" va h.k.) bo'lsa
     row0_vals = [str(x).strip().lower() for x in df_sheet.iloc[0, :7]] if len(df_sheet) > 0 else []
     if any(k in row0_vals for k in ("spllikter", "splitter", "сплиттер", "login")):
         new_cols = list(df_sheet.columns)
@@ -175,7 +174,6 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
         df_sheet.columns = new_cols
         df_sheet = df_sheet.iloc[1:].reset_index(drop=True)
 
-    # Agar 0-qatorda silliq ko'rinishda ("OLT Paxtakor" | "1/1/1") berilgan bo'lsa
     if len(df_sheet) > 0 and pd.isna(df_sheet.iloc[0, 0]):
         c1_str = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
         c2_str = str(df_sheet.iloc[0, 2]).strip() if len(df_sheet.columns) > 2 and pd.notna(df_sheet.iloc[0, 2]) else ""
@@ -226,7 +224,6 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
             c1_s = " ".join(str(col1_val).split()) if pd.notna(col1_val) and str(col1_val).strip().lower() != "nan" else ""
             c2_s = " ".join(str(col2_val).split()) if pd.notna(col2_val) and str(col2_val).strip().lower() != "nan" else ""
 
-            # Masalan: col1 = "OLT Paxtakor", col2 = "1/1/1" yoki col1 = "Spllikter"
             if c1_s.lower() in ("spllikter", "splitter", "сплиттер"):
                 continue
 
@@ -357,7 +354,7 @@ try:
 except Exception as e:
     print(f"❌ OLT файлини ўқишда хатолик: {e}")
 
-# 3b. Toma OLT_yangilangan_2.xlsx / Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalarini o'qish
+# 3b. Toma OLT uskunalarini o'qish
 try:
     toma_eq_file = next((f for f in EXCEL_TOMA_EQUIPMENT_CANDIDATES if os.path.exists(f)), None)
     if toma_eq_file:
@@ -440,7 +437,7 @@ try:
 except Exception as e:
     print(f"❌ OLT Yosh kuch.xlsx файлини ўқишда хатолик: {e}")
 
-# 3e. Navoi_2.xlsx / Navoi.xlsx uskunalarini o'qish
+# 3e. Navoi uskunalarini o'qish
 try:
     nav_eq_file = next((f for f in EXCEL_NAVVOI_EQUIPMENT_CANDIDATES if os.path.exists(f)), None)
     if nav_eq_file:
@@ -479,7 +476,7 @@ try:
 except Exception as e:
     print(f"❌ Navoi файлини ўқишда хатолик: {e}")
 
-# 3f. Markaz 2.xlsx ma'lumotlarini o'qish ("Markaz 2" va "Markaz 2 splitter" varaqlari)
+# 3f. Markaz 2.xlsx ma'lumotlarini o'qish
 try:
     if os.path.exists(EXCEL_MARKAZ2):
         xls_m2 = pd.ExcelFile(EXCEL_MARKAZ2)
@@ -573,7 +570,6 @@ try:
 
         if "splitter" in paxt_sheets:
             df_paxt_sp = pd.read_excel(paxt_eq_file, sheet_name=paxt_sheets["splitter"])
-            # Ustki qatorlarda montyor nomi bo'lsa aniqlaymiz
             detected_paxt_montyor = paxtakor_montyor
             for c_name in df_paxt_sp.columns:
                 c_str = " ".join(str(c_name).split())
@@ -1103,31 +1099,61 @@ def search_all_databases(query: str) -> str:
         return "⚠️ Абонент қидириш учун камида 2 та белги киритинг."
 
     # 1. OLT portlaridan faqat band abonentlar bo'yicha qidirish
-    olt_hits = [
-        p for p in (tayanch_olt_list + toma_olt_list + markaz2_olt_list + paxtakor_olt_list)
-        if p["client"] != "Бўш порт"
-        and q in f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']} {p['splitter']}".lower()
+    olt_sources = [
+        ("Tayanch OLT", tayanch_olt_list, tayanch_montyor),
+        ("TOMA OLT", toma_olt_list, toma_montyor),
+        ("OLT Марказ2", markaz2_olt_list, ""),
+        ("OLT Пахтакор", paxtakor_olt_list, paxtakor_montyor),
     ]
 
-    # 2. Abonentlar bazasidan qidirish
-    sub_hits = [
-        s for s in subscribers_list
-        if q in f"{s['client']} {s['login']} {s['phone']} {s['msisdn']} {s['address']}".lower()
-    ]
+    olt_hits = []
+    for olt_label, port_list, default_mont in olt_sources:
+        for p in port_list:
+            if p["client"] == "Бўш порт":
+                continue
+            mont_name = p.get("montyor") or default_mont or "Кўрсатилмаган"
+            haystack = (
+                f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} "
+                f"{p['address']} {p['splitter']} {olt_label} {mont_name}"
+            ).lower()
+            if q in haystack:
+                item_copy = dict(p)
+                item_copy["olt_zone"] = olt_label
+                item_copy["montyor_display"] = mont_name
+                olt_hits.append(item_copy)
+
+    # 2. Abonentlar bazasidan qidirish + OLT / montyor hududini aniqlash
+    sub_hits = []
+    for s in subscribers_list:
+        haystack = f"{s['client']} {s['login']} {s['phone']} {s['msisdn']} {s['address']}".lower()
+        if q in haystack:
+            addr_low = s["address"].lower()
+            matched_zones = []
+
+            for p in olt_hits:
+                if p["login"] != "-" and p["login"].lower() == s["login"].lower():
+                    matched_zones.append(f"{p['olt_zone']} ({p['montyor_display']})")
+
+            if any(k in addr_low for k in ("paxtakor", "пахтакор", "қирқёп", "qirqyop", "сарапоён", "sarapoyon")):
+                matched_zones.append(f"OLT Пахтакор ({paxtakor_montyor})")
+            if any(k in addr_low for k in ("xonkobod", "хонкобод")):
+                matched_zones.append(f"OLT Xonkobod ({xonkobod_montyor})")
+            if any(k in addr_low for k in ("ёш куч", "yosh kuch", "yoshkuch")):
+                matched_zones.append(f"OLT Yosh kuch ({yosh_kuch_montyor})")
+            if any(k in addr_low for k in ("навои", "navoi")):
+                matched_zones.append(f"OLT Навои ({navoi_montyor})")
+            if any(k in addr_low for k in ("дурвадик", "durvadik")):
+                matched_zones.append(f"OLT Дурвадик ({durvadik_montyor})")
+
+            unique_zones = list(dict.fromkeys(matched_zones))
+            sub_copy = dict(s)
+            sub_copy["zone_info"] = ", ".join(unique_zones) if unique_zones else "Хонқа тумани (Абонентлар базаси)"
+            sub_hits.append(sub_copy)
 
     if not olt_hits and not sub_hits:
         return f"❌ <b>«{html.quote(query)}»</b> бўйича абонент топилмади."
 
     out = [f"🔎 <b>Абонент қидируви натижалари («{html.quote(query)}»):</b>"]
-
-    if sub_hits:
-        out.append(f"\n👥 <b>Абонентлар базасида ({len(sub_hits)} та):</b>")
-        for s in sub_hits[:8]:
-            out.append(
-                f"• <b>{html.quote(s['client'])}</b> (<code>{html.quote(s['login'])}</code>)\n"
-                f"  📞 {html.quote(s['phone'])} | Тариф: {html.quote(s['rate_plan'])} | Баланс: {html.quote(s['balance'])}\n"
-                f"  🏠 {html.quote(s['address'])}"
-            )
 
     if olt_hits:
         out.append(f"\n🔌 <b>OLT абонентларида ({len(olt_hits)} та):</b>")
@@ -1138,10 +1164,22 @@ def search_all_databases(query: str) -> str:
             if p["ip"] != "-":
                 extra.append(f"IP: <code>{html.quote(p['ip'])}</code>")
             extra_str = f" | {' | '.join(extra)}" if extra else ""
+
             out.append(
                 f"• <b>{html.quote(p['client'])}</b> ({html.quote(p['splitter'])} — {html.quote(p['port'])}-порт)\n"
-                f"  🔑 <code>{html.quote(p['login'])}</code> | 📞 {html.quote(p['phone'])}{extra_str}\n"
-                f"  🏠 {html.quote(p['address'])}"
+                f"  📍 Ҳудуд: <b>{html.quote(p['olt_zone'])}</b> | 👷 Монтёр: <b>{html.quote(p['montyor_display'])}</b>\n"
+                f"  🔑 <code>{html.quote(p['login'])}</code> | 📞 Тел: {html.quote(p['phone'])}{extra_str}\n"
+                f"  🏠 Манзил: {html.quote(p['address'])}"
+            )
+
+    if sub_hits:
+        out.append(f"\n👥 <b>Абонентлар базасида ({len(sub_hits)} та):</b>")
+        for s in sub_hits[:8]:
+            out.append(
+                f"• <b>{html.quote(s['client'])}</b> (<code>{html.quote(s['login'])}</code>)\n"
+                f"  📍 Ҳудуд: <b>{html.quote(s['zone_info'])}</b>\n"
+                f"  📞 Тел: {html.quote(s['phone'])} | Тариф: {html.quote(s['rate_plan'])} | Баланс: {html.quote(s['balance'])}\n"
+                f"  🏠 Манзил: {html.quote(s['address'])}"
             )
 
     return "\n".join(out)
