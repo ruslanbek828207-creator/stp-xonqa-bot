@@ -259,12 +259,11 @@ navoi_equipment_list = []
 navoi_source_file = EXCEL_NAVVOI_EQUIPMENT_CANDIDATES[0]
 navoi_montyor = "ALI MASHARIPOV"
 
-# OLT Markaz 2 ma'lumotlari va montyori
+# OLT Markaz 2 ma'lumotlari
 markaz2_olt_list = []
 markaz2_splitters_order = []
 markaz2_by_splitter = {}
 markaz2_scheme_list = []
-markaz2_montyor = "ALI MASHARIPOV"
 
 
 def clean_phone(val) -> str:
@@ -305,14 +304,6 @@ def short_splitter_label(full_name: str, prefixes: list[str]) -> str:
 def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[list[dict], list[str], dict[str, list[dict]], str]:
     df_sheet = df_sheet.copy()
     detected_montyor = default_montyor
-
-    for col_name in df_sheet.columns:
-        c_str = " ".join(str(col_name).replace("\xa0", " ").split())
-        if "elektramantyori" in c_str.lower() or "montyor" in c_str.lower() or "mantyor" in c_str.lower():
-            continue
-        if not str(col_name).startswith("Unnamed") and len(c_str) > 3 and c_str.lower() not in ("spllikter", "splitter", "сплиттер"):
-            detected_montyor = c_str
-            break
 
     row0_col1 = str(df_sheet.iloc[0, 1]).strip() if len(df_sheet) > 0 and len(df_sheet.columns) > 1 and pd.notna(df_sheet.iloc[0, 1]) else ""
     if row0_col1.lower() in ("spllikter", "splitter", "сплиттер"):
@@ -645,10 +636,12 @@ try:
 
         if "Markaz 2 splitter" in m2_sheets:
             df_m2_sp = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2 splitter"])
-            markaz2_olt_list, markaz2_splitters_order, markaz2_by_splitter, markaz2_montyor = parse_olt_sheet(
-                df_m2_sp, default_montyor=markaz2_montyor
+            markaz2_olt_list, markaz2_splitters_order, markaz2_by_splitter, _ = parse_olt_sheet(
+                df_m2_sp, default_montyor=""
             )
-            print(f"✅ Markaz 2 splitter юкланди: {len(markaz2_splitters_order)} та сплиттер, {len(markaz2_olt_list)} та порт (Монтёр: {markaz2_montyor})")
+            for p in markaz2_olt_list:
+                p["montyor"] = ""
+            print(f"✅ Markaz 2 splitter юкланди: {len(markaz2_splitters_order)} та сплиттер, {len(markaz2_olt_list)} та порт")
 
         if "Markaz 2" in m2_sheets:
             df_m2_main = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2"])
@@ -668,7 +661,6 @@ try:
                         "splitter_ur": sp_ur if sp_ur and sp_ur.lower() != "nan" else "-",
                         "port_1xn": port_1xn if port_1xn and port_1xn.lower() != "nan" else "-",
                         "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
-                        "montyor": markaz2_montyor
                     })
             print(f"✅ Markaz 2 схемаси юкланди: {len(markaz2_scheme_list)} та ёзув")
 except Exception as e:
@@ -1138,7 +1130,7 @@ async def cmd_stats(message: Message):
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
-        f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема | Монтёр: <b>{html.quote(markaz2_montyor)}</b>)\n"
+        f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
         f"• Муфталар: <b>{len(muftalar_list)} та</b>",
         reply_markup=keyboard
     )
@@ -1262,7 +1254,7 @@ async def cb_olt_pagination_and_ports(callback: CallbackQuery):
         sp_order = markaz2_splitters_order
         by_sp = markaz2_by_splitter
         sp_prefixes = ["OLT Markaz 2", "Markaz 2", "Markaz"]
-        montyor = markaz2_montyor
+        montyor = ""
         title = "OLT Марказ2"
 
     if data.endswith("_noop"):
@@ -1395,7 +1387,6 @@ async def handle_text(message: Message):
             )
             await message.answer(
                 f"🏢 <b>OLT Марказ2</b> сплиттерлари (Жами: <b>{len(markaz2_splitters_order)} та</b>)\n"
-                f"👷 Монтёр: <b>{html.quote(markaz2_montyor)}</b>\n"
                 "Сплиттерни танланг:",
                 reply_markup=mk
             )
