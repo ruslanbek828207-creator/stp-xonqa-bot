@@ -76,6 +76,18 @@ EXTRA_OLT_NAMES = [
     "Пахтагул",
 ]
 
+# Har bir hudud / OLT uchun biriktirilgan montyorlar
+ZONE_MONTYORS = {
+    "tayanch": "Jumaniyazov Ruslan",
+    "toma": "Jumaniyazov Ruslan",
+    "xonkobod": "Юсупов Бобур Сапарбой ўғли",
+    "yosh_kuch": "Юлдошов Кадамбой Атабоевич",
+    "navoi": "Машарипов Али Валиевич",
+    "durvadik": "Jumaniyazov Ruslan Рустамович",
+    "paxtakor": "Iskandar Bobojonov",
+    "markaz2": "Шоназаров Достон Хайитбоевич, Umar Xamdam",
+}
+
 splitters_list = []
 subscribers_list = []
 
@@ -83,7 +95,7 @@ subscribers_list = []
 tayanch_olt_list = []
 tayanch_splitters_order = []
 tayanch_by_splitter = {}
-tayanch_montyor = "Jumaniyazov Ruslan"
+tayanch_montyor = ZONE_MONTYORS["tayanch"]
 
 # TOMA OLT ma'lumotlari va montyori
 toma_olt_list = []
@@ -91,30 +103,31 @@ toma_splitters_order = []
 toma_by_splitter = {}
 toma_equipment_list = []
 toma_source_file = EXCEL_TOMA_EQUIPMENT_CANDIDATES[0]
-toma_montyor = "Jumaniyazov Ruslan"
+toma_montyor = ZONE_MONTYORS["toma"]
 
 # OLT Xonkobod uskunalari va montyori
 xonkobod_equipment_list = []
-xonkobod_montyor = "Yusupov Bobur"
+xonkobod_montyor = ZONE_MONTYORS["xonkobod"]
 
 # OLT Yosh kuch uskunalari va montyori
 yosh_kuch_equipment_list = []
-yosh_kuch_montyor = "Yo'ldashov Qadamboy"
+yosh_kuch_montyor = ZONE_MONTYORS["yosh_kuch"]
 
 # OLT Navoi uskunalari va montyori
 navoi_equipment_list = []
 navoi_source_file = EXCEL_NAVVOI_EQUIPMENT_CANDIDATES[0]
-navoi_montyor = "ALI MASHARIPOV"
+navoi_montyor = ZONE_MONTYORS["navoi"]
 
-# OLT Markaz 2 ma'lumotlari
+# OLT Markaz 2 ma'lumotlari va montyori
 markaz2_olt_list = []
 markaz2_splitters_order = []
 markaz2_by_splitter = {}
 markaz2_scheme_list = []
+markaz2_montyor = ZONE_MONTYORS["markaz2"]
 
 # OLT Durvadik ma'lumotlari va montyori
 durvadik_list = []
-durvadik_montyor = "Ruslan Jumaniyazov"
+durvadik_montyor = ZONE_MONTYORS["durvadik"]
 
 # OLT Paxtakor ma'lumotlari va montyori
 paxtakor_list = []
@@ -122,7 +135,7 @@ paxtakor_olt_list = []
 paxtakor_splitters_order = []
 paxtakor_by_splitter = {}
 paxtakor_source_file = EXCEL_PAXTAKOR_CANDIDATES[-1]
-paxtakor_montyor = "Bobojonov Iskandar"
+paxtakor_montyor = ZONE_MONTYORS["paxtakor"]
 
 
 def clean_phone(val) -> str:
@@ -135,6 +148,23 @@ def clean_phone(val) -> str:
         return str(int(float(s)))
     except (ValueError, TypeError):
         return s
+
+
+def detect_montyor_by_address_and_splitter(address: str, splitter: str, olt_label: str, fallback: str) -> str:
+    text = f"{address} {splitter} {olt_label}".lower()
+    if any(k in text for k in ("paxtakor", "пахтакор", "қирқёп", "qirqyop", "сарапоён", "sarapoyon")):
+        return ZONE_MONTYORS["paxtakor"]
+    if any(k in text for k in ("xonkobod", "хонкобод", "тинчлик", "tinchlik")):
+        return ZONE_MONTYORS["xonkobod"]
+    if any(k in text for k in ("ёш куч", "yosh kuch", "yoshkuch", "олмазор", "olmazor")):
+        return ZONE_MONTYORS["yosh_kuch"]
+    if any(k in text for k in ("навои", "navoi", "навхос", "navxos", "дўстлик", "do'stlik")):
+        return ZONE_MONTYORS["navoi"]
+    if any(k in text for k in ("дурвадик", "durvadik", "сарқипчоқ", "sarqipchoq", "мадир", "madir")):
+        return ZONE_MONTYORS["durvadik"]
+    if "марказ2" in text or "markaz 2" in text or "markaz2" in text:
+        return ZONE_MONTYORS["markaz2"]
+    return fallback
 
 
 def pick_column(df: pd.DataFrame, candidates: list[str], fallback_idx: int | None = None) -> str | None:
@@ -445,12 +475,6 @@ try:
         xls_nav = pd.ExcelFile(nav_eq_file)
         for s_name in xls_nav.sheet_names:
             df_nav = pd.read_excel(nav_eq_file, sheet_name=s_name)
-            for col_name in df_nav.columns:
-                c_low = str(col_name).strip().lower()
-                if "masharipov" in c_low or "montyor" in c_low or "mantyor" in c_low:
-                    navoi_montyor = " ".join(str(col_name).split())
-                    break
-
             code_col = pick_column(df_nav, ["Kod / Port", "Kod porta", "Nomer oborud.", "Kod"], 0)
             rep_col = pick_column(df_nav, ["Kod / Port (Takror)", "Takror"], None)
             hudud_col = pick_column(df_nav, ["Set / Hudud", "Set", "Hudud"], 2)
@@ -485,11 +509,11 @@ try:
         if "Markaz 2 splitter" in m2_sheets:
             df_m2_sp = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2 splitter"])
             markaz2_olt_list, markaz2_splitters_order, markaz2_by_splitter, _ = parse_olt_sheet(
-                df_m2_sp, default_montyor=""
+                df_m2_sp, default_montyor=markaz2_montyor
             )
             for p in markaz2_olt_list:
-                p["montyor"] = ""
-            print(f"✅ Markaz 2 splitter юкланди: {len(markaz2_splitters_order)} та сплиттер, {len(markaz2_olt_list)} та порт")
+                p["montyor"] = markaz2_montyor
+            print(f"✅ Markaz 2 splitter юкланди: {len(markaz2_splitters_order)} та сплиттер, {len(markaz2_olt_list)} та порт (Монтёр: {markaz2_montyor})")
 
         if "Markaz 2" in m2_sheets:
             df_m2_main = pd.read_excel(EXCEL_MARKAZ2, sheet_name=m2_sheets["Markaz 2"])
@@ -520,16 +544,6 @@ try:
         xls_durv = pd.ExcelFile(EXCEL_DURVADIK)
         for s_name in xls_durv.sheet_names:
             df_durv = pd.read_excel(EXCEL_DURVADIK, sheet_name=s_name)
-            for r_idx in range(df_durv.shape[0]):
-                for c_idx in range(df_durv.shape[1]):
-                    v_cell = df_durv.iat[r_idx, c_idx]
-                    if pd.notna(v_cell):
-                        sv = " ".join(str(v_cell).replace("\xa0", " ").split())
-                        if "elektramont" in sv.lower() or "montyor" in sv.lower() or "mantyor" in sv.lower():
-                            parts_m = sv.split(":", 1)
-                            if len(parts_m) == 2 and parts_m[1].strip():
-                                durvadik_montyor = parts_m[1].strip()
-
             tr_col = pick_column(df_durv, ["T/r", "№", "Nomer"], 0)
             set_col = pick_column(df_durv, ["Set", "Hudud"], 1)
             sp_col = pick_column(df_durv, ["Splitter (Bittadan)", "Splitter", "Spllikter", "Kod / Port"], 2)
@@ -570,18 +584,11 @@ try:
 
         if "splitter" in paxt_sheets:
             df_paxt_sp = pd.read_excel(paxt_eq_file, sheet_name=paxt_sheets["splitter"])
-            detected_paxt_montyor = paxtakor_montyor
-            for c_name in df_paxt_sp.columns:
-                c_str = " ".join(str(c_name).split())
-                if "mantyor" in c_str.lower() or "montyor" in c_str.lower() or "elektramont" in c_str.lower():
-                    parts_c = c_str.split(":", 1)
-                    detected_paxt_montyor = parts_c[1].strip() if len(parts_c) == 2 and parts_c[1].strip() else c_str
-                    break
-
             paxtakor_olt_list, paxtakor_splitters_order, paxtakor_by_splitter, _ = parse_olt_sheet(
-                df_paxt_sp, default_montyor=detected_paxt_montyor
+                df_paxt_sp, default_montyor=paxtakor_montyor
             )
-            paxtakor_montyor = detected_paxt_montyor
+            for p in paxtakor_olt_list:
+                p["montyor"] = paxtakor_montyor
             print(
                 f"✅ {paxt_eq_file} [Splitter] юкланди: {len(paxtakor_splitters_order)} та сплиттер, "
                 f"{len(paxtakor_olt_list)} та порт (Монтёр: {paxtakor_montyor})"
@@ -590,16 +597,6 @@ try:
         main_sheet_key = next((k for k in paxt_sheets if k != "splitter"), None)
         if main_sheet_key:
             df_paxt = pd.read_excel(paxt_eq_file, sheet_name=paxt_sheets[main_sheet_key])
-            for r_idx in range(df_paxt.shape[0]):
-                for c_idx in range(df_paxt.shape[1]):
-                    v_cell = df_paxt.iat[r_idx, c_idx]
-                    if pd.notna(v_cell):
-                        sv = " ".join(str(v_cell).replace("\xa0", " ").split())
-                        if "elektramont" in sv.lower() or "mantyor" in sv.lower() or "montyor" in sv.lower():
-                            parts_m = sv.split(":", 1)
-                            if len(parts_m) == 2 and parts_m[1].strip():
-                                paxtakor_montyor = parts_m[1].strip()
-
             tr_col = pick_column(df_paxt, ["T/r", "№", "Nomer"], 0)
             set_col = pick_column(df_paxt, ["Set", "Hudud"], 1)
             sp_col = pick_column(df_paxt, ["Splitter (Bittadan)", "Splitter", "Spllikter", "Kod / Port"], 2)
@@ -631,25 +628,25 @@ except Exception as e:
     print(f"❌ OLT Paxtakor файлини ўқишда хатолик: {e}")
 
 ELECTRICIANS_DATA = {
-    "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
+    "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ (OLT Марказ / Марказ2)", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
     "elect_2": {"name": "Отабоев Рамзиддин Рахматилло угли", "phone": "+998995603938", "zone": "Хонқа тумани, Пахтакор МФЙ", "task": "Бетон столбаларда ишлаш, drop кабель тортиш ва роутерларни созлаш."},
-    "elect_3": {"name": "Юсупов Бобур Сапарбой ўғли", "phone": "+998995601312", "zone": "Хонқа тумани, Тинчлик МФЙ", "task": "1х16 сплиттерларда сигнални текшириш ва носозликларни бартараф этиш."},
+    "elect_3": {"name": "Юсупов Бобур Сапарбой ўғли", "phone": "+998995601312", "zone": "Хонқа тумани, Тинчлик МФЙ (OLT Xonkobod)", "task": "1х16 сплиттерларда сигнални текшириш ва носозликларни бартараф этиш."},
     "elect_4": {"name": "Каримов Илхом Машарипович", "phone": "+998995606399", "zone": "Хонқа тумани, Гулистон МФЙ", "task": "Интернет линияларини таъмирлаш ва абонентлар мурожаатлари билан ишлаш."},
     "elect_6": {"name": "Жуманиёзов Жўшқин Шоназарович", "phone": "+998995608636", "zone": "Хонқа тумани, Бўстон МФЙ", "task": "ZTE ва TP-Link роутерларини созлаш, интернет тармоқларини тест қилиш."},
     "elect_7": {"name": "Атажанов Рустам Комоладдинович", "phone": "+998992797072", "zone": "Хонқа тумани, Истиқлол МФЙ", "task": "Янги абонентларни тармоққа улаш ва шартнома масалалари."},
     "elect_8": {"name": "Каримов Заир Авезметович", "phone": "+998995601310", "zone": "Хонқа тумани, Оқолтин МФЙ", "task": "Столбаларга чиқиш, ҳаво линияларини монтаж қилиш."},
-    "elect_9": {"name": "Бабажанов Искандар Сапарбекович", "phone": "+998995603005", "zone": "Хонқа тумани, Қоратепа МФЙ", "task": "Магистрал оптик тармоқларга хизмат кўрсатиш."},
+    "elect_9": {"name": "Бабажанов Искандар Сапарбекович", "phone": "+998995603005", "zone": "Хонқа тумани, Қоратепа МФЙ (OLT Пахтакор)", "task": "Магистрал оптик тармоқларга хизмат кўрсатиш."},
     "elect_10": {"name": "Каримов Дониёр Хаджибоевич", "phone": "+998995603171", "zone": "Хонқа тумани, Шихрезван МФЙ", "task": "Абонентлар уйига интернет кабелларини тортиш ва улаш."},
-    "elect_11": {"name": "Жуманиёзов Руслан Рустамович", "phone": "+998995603937", "zone": "Хонқа тумани (Бошқарув ва техник назорат)", "task": "Техник ёрдам, тармоқ мониторинги, OSS портал ва бот бошқаруви."},
+    "elect_11": {"name": "Жуманиёзов Руслан Рустамович", "phone": "+998995603937", "zone": "Хонқа тумани (Tayanch OLT / TOMA OLT / OLT Дурвадик)", "task": "Техник ёрдам, тармоқ мониторинги, OSS портал ва бот бошқаруви."},
     "elect_12": {"name": "Саидов Хушнуд Матяқубович", "phone": "+998992797071", "zone": "Хонқа тумани, Ҳаётобод МФЙ", "task": "Оптик сварка ишлари ва таъмирлаш."},
-    "elect_13": {"name": "Жаббаров Хамдам Рустамович", "phone": "+998995603936", "zone": "Хонқа тумани, Сарқипчоқ МФЙ", "task": "Авария ҳолатларини бартараф этиш ва тушган аризалар билан ишлаш."},
+    "elect_13": {"name": "Жаббаров Хамдам Рустамович", "phone": "+998995603936", "zone": "Хонқа тумани, Сарқипчоқ МФЙ (OLT Марказ2)", "task": "Авария ҳолатларини бартараф этиш ва тушган аризалар билан ишлаш."},
     "elect_14": {"name": "Хаитов Хаитбай Шоназарович", "phone": "+998995603934", "zone": "Хонқа тумани, Қипчоқ МФЙ", "task": "Интернет тармоқларини кенгайтириш ва янги нуқталарни улаш."},
     "elect_15": {"name": "Саидов Умарбек Шавкатович", "phone": "+998995603002", "zone": "Хонқа тумани, Заркент МФЙ", "task": "Сплиттерлар ва тақсимот қутиларини назорат қилиш."},
     "elect_16": {"name": "Эгамов Азизбек Озод угли", "phone": "+998977929525", "zone": "Хонқа тумани, Чармгар МФЙ", "task": "Абонент моделларини созлаш ва техник ёрдам кўрсатиш."},
     "elect_17": {"name": "Якубов Жасурбек Ахмеджонович", "phone": "+998995606787", "zone": "Хонқа тумани, Янги ҳаёт МФЙ", "task": "Оптик кабель узилишларини тезкор бартараф этиш."},
-    "elect_18": {"name": "Машарипов Али Валиевич", "phone": "+998995603931", "zone": "Хонқа тумани, Дўстлик МФЙ", "task": "Тармоқ қурилмаларини ўрнатиш ва созлаш."},
+    "elect_18": {"name": "Машарипов Али Валиевич", "phone": "+998995603931", "zone": "Хонқа тумани, Дўстлик МФЙ (OLT Навои)", "task": "Тармоқ қурилмаларини ўрнатиш ва созлаш."},
     "elect_19": {"name": "Ваисов Рустам Юсуфбоевич", "phone": "+998995603935", "zone": "Хонқа тумани, Меҳнатобод МФЙ", "task": "Абонентларга сифатли интернет улаш ва линияларни текшириш."},
-    "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Хонқа тумани, Олмазор МФЙ", "task": "Электр ва оптик тармоқларда профилактика ишлари."},
+    "elect_20": {"name": "Юлдошов Кадамбой Атабоевич", "phone": "+998995603007", "zone": "Хонқа тумани, Олмазор МФЙ (OLT Yosh kuch)", "task": "Электр ва оптик тармоқларда профилактика ишлари."},
 }
 
 
@@ -726,13 +723,19 @@ def build_olt_page_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[dict]], montyor: str = "") -> str:
+def format_splitter_ports_text(splitter_name: str, by_splitter: dict[str, list[dict]], montyor: str = "", olt_label: str = "") -> str:
     ports = by_splitter.get(splitter_name, [])
     busy_cnt = sum(1 for p in ports if p["client"] != "Бўш порт")
     free_cnt = len(ports) - busy_cnt
 
     lines = [f"🔌 <b>{html.quote(splitter_name)}</b>"]
-    if montyor:
+    if ports:
+        sample_m = detect_montyor_by_address_and_splitter(
+            ports[0].get("address", ""), splitter_name, olt_label, montyor
+        )
+        if sample_m:
+            lines.append(f"👷 Участка монтёри: <b>{html.quote(sample_m)}</b>")
+    elif montyor:
         lines.append(f"👷 Участка монтёри: <b>{html.quote(montyor)}</b>")
     lines.append(f"📊 Портлар: <b>{busy_cnt} банд</b> / <b>{free_cnt} бўш</b> (Жами: {len(ports)} та)\n")
 
@@ -1010,7 +1013,10 @@ def format_extra_olt_summary(olt_name: str) -> str:
     if matched_ports:
         lines.append(f"🔌 OLT портларда топилди: <b>{len(matched_ports)} та</b>\n")
         for item in matched_ports[:8]:
-            mont_str = f" | 👷 {html.quote(item['montyor'])}" if item.get("montyor") else ""
+            m_name = detect_montyor_by_address_and_splitter(
+                item.get("address", ""), item.get("splitter", ""), olt_name, item.get("montyor", "")
+            )
+            mont_str = f" | 👷 {html.quote(m_name)}" if m_name else ""
             lines.append(
                 f"🏷 <b>{html.quote(item['splitter'])}</b> (Порт: {html.quote(item['port'])}) — <b>{html.quote(item['client'])}</b>{mont_str}\n"
                 f"   🔑 Логин: <code>{html.quote(item['login'])}</code> | 📞 Тел: {html.quote(item['phone'])}\n"
@@ -1102,7 +1108,7 @@ def search_all_databases(query: str) -> str:
     olt_sources = [
         ("Tayanch OLT", tayanch_olt_list, tayanch_montyor),
         ("TOMA OLT", toma_olt_list, toma_montyor),
-        ("OLT Марказ2", markaz2_olt_list, ""),
+        ("OLT Марказ2", markaz2_olt_list, markaz2_montyor),
         ("OLT Пахтакор", paxtakor_olt_list, paxtakor_montyor),
     ]
 
@@ -1111,7 +1117,9 @@ def search_all_databases(query: str) -> str:
         for p in port_list:
             if p["client"] == "Бўш порт":
                 continue
-            mont_name = p.get("montyor") or default_mont or "Кўрсатилмаган"
+            mont_name = detect_montyor_by_address_and_splitter(
+                p.get("address", ""), p.get("splitter", ""), olt_label, default_mont
+            )
             haystack = (
                 f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} "
                 f"{p['address']} {p['splitter']} {olt_label} {mont_name}"
@@ -1132,22 +1140,22 @@ def search_all_databases(query: str) -> str:
 
             for p in olt_hits:
                 if p["login"] != "-" and p["login"].lower() == s["login"].lower():
-                    matched_zones.append(f"{p['olt_zone']} ({p['montyor_display']})")
+                    matched_zones.append(f"{p['olt_zone']} — {p['montyor_display']}")
 
             if any(k in addr_low for k in ("paxtakor", "пахтакор", "қирқёп", "qirqyop", "сарапоён", "sarapoyon")):
-                matched_zones.append(f"OLT Пахтакор ({paxtakor_montyor})")
-            if any(k in addr_low for k in ("xonkobod", "хонкобод")):
-                matched_zones.append(f"OLT Xonkobod ({xonkobod_montyor})")
-            if any(k in addr_low for k in ("ёш куч", "yosh kuch", "yoshkuch")):
-                matched_zones.append(f"OLT Yosh kuch ({yosh_kuch_montyor})")
-            if any(k in addr_low for k in ("навои", "navoi")):
-                matched_zones.append(f"OLT Навои ({navoi_montyor})")
-            if any(k in addr_low for k in ("дурвадик", "durvadik")):
-                matched_zones.append(f"OLT Дурвадик ({durvadik_montyor})")
+                matched_zones.append(f"OLT Пахтакор — {paxtakor_montyor}")
+            if any(k in addr_low for k in ("xonkobod", "хонкобод", "тинчлик", "tinchlik")):
+                matched_zones.append(f"OLT Xonkobod — {xonkobod_montyor}")
+            if any(k in addr_low for k in ("ёш куч", "yosh kuch", "yoshkuch", "олмазор", "olmazor")):
+                matched_zones.append(f"OLT Yosh kuch — {yosh_kuch_montyor}")
+            if any(k in addr_low for k in ("навои", "navoi", "навхос", "navxos", "дўстлик", "do'stlik")):
+                matched_zones.append(f"OLT Навои — {navoi_montyor}")
+            if any(k in addr_low for k in ("дурвадик", "durvadik", "сарқипчоқ", "sarqipchoq", "мадир", "madir")):
+                matched_zones.append(f"OLT Дурвадик — {durvadik_montyor}")
 
             unique_zones = list(dict.fromkeys(matched_zones))
             sub_copy = dict(s)
-            sub_copy["zone_info"] = ", ".join(unique_zones) if unique_zones else "Хонқа тумани (Абонентлар базаси)"
+            sub_copy["zone_info"] = ", ".join(unique_zones) if unique_zones else f"Хонқа тумани — {tayanch_montyor}"
             sub_hits.append(sub_copy)
 
     if not olt_hits and not sub_hits:
@@ -1177,7 +1185,7 @@ def search_all_databases(query: str) -> str:
         for s in sub_hits[:8]:
             out.append(
                 f"• <b>{html.quote(s['client'])}</b> (<code>{html.quote(s['login'])}</code>)\n"
-                f"  📍 Ҳудуд: <b>{html.quote(s['zone_info'])}</b>\n"
+                f"  📍 Ҳудуд ва монтёр: <b>{html.quote(s['zone_info'])}</b>\n"
                 f"  📞 Тел: {html.quote(s['phone'])} | Тариф: {html.quote(s['rate_plan'])} | Баланс: {html.quote(s['balance'])}\n"
                 f"  🏠 Манзил: {html.quote(s['address'])}"
             )
@@ -1228,7 +1236,7 @@ async def cmd_stats(message: Message):
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
-        f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
+        f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема | Монтёр: <b>{html.quote(markaz2_montyor)}</b>)\n"
         f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)\n"
         f"• OLT Пахтакор сплиттерлар: <b>{len(paxtakor_splitters_order)} та</b> ({len(paxtakor_olt_list)} порт, {len(paxtakor_list)} объект | {html.quote(paxtakor_source_file)} | Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
         reply_markup=keyboard
@@ -1353,7 +1361,7 @@ async def cb_olt_pagination_and_ports(callback: CallbackQuery):
         sp_order = markaz2_splitters_order
         by_sp = markaz2_by_splitter
         sp_prefixes = ["OLT Markaz 2", "Markaz 2", "Markaz"]
-        montyor = ""
+        montyor = markaz2_montyor
         title = "OLT Марказ2"
     else:
         prefix = "pxolt"
@@ -1387,7 +1395,7 @@ async def cb_olt_pagination_and_ports(callback: CallbackQuery):
 
         if 0 <= sp_idx < len(sp_order):
             sp_name = sp_order[sp_idx]
-            formatted = format_splitter_ports_text(sp_name, by_sp, montyor=montyor)
+            formatted = format_splitter_ports_text(sp_name, by_sp, montyor=montyor, olt_label=title)
             await send_long_message(callback.message, formatted)
             await callback.answer()
         else:
@@ -1533,6 +1541,7 @@ async def handle_text(message: Message):
             )
             await message.answer(
                 f"🏢 <b>OLT Марказ2</b> сплиттерлари (Жами: <b>{len(markaz2_splitters_order)} та</b>)\n"
+                f"👷 Монтёр: <b>{html.quote(markaz2_montyor)}</b>\n"
                 "Сплиттерни танланг:",
                 reply_markup=mk
             )
