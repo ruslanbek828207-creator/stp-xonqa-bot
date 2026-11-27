@@ -39,12 +39,16 @@ EXCEL_OLT_CANDIDATES = [
     "Tayanch OLT_2.xlsx",
 ]
 EXCEL_TOMA_EQUIPMENT_CANDIDATES = [
+    "Toma OLT_yangilangan_2.xlsx",
     "Toma OLT_yangilangan.xlsx",
     "Toma OLT.xlsx",
 ]
 EXCEL_XONKOBOD_EQUIPMENT = "OLT_Xonkobod_tayyor.xlsx"
 EXCEL_YOSH_KUCH_EQUIPMENT = "OLT Yosh kuch.xlsx"
-EXCEL_NAVVOI_EQUIPMENT = "Navoi.xlsx"
+EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
+    "Navoi_2.xlsx",
+    "Navoi.xlsx",
+]
 
 MUFTA_FILES = [
     "Shodiyona ko’chasi Mufta.xlsx",
@@ -251,6 +255,7 @@ yosh_kuch_montyor = "Yo'ldashov Qadamboy"
 
 # OLT Navoi uskunalari va montyori
 navoi_equipment_list = []
+navoi_source_file = EXCEL_NAVVOI_EQUIPMENT_CANDIDATES[0]
 navoi_montyor = "ALI MASHARIPOV"
 
 
@@ -264,6 +269,22 @@ def clean_phone(val) -> str:
         return str(int(float(s)))
     except (ValueError, TypeError):
         return s
+
+
+def pick_column(df: pd.DataFrame, candidates: list[str], fallback_idx: int | None = None) -> str | None:
+    cols_map = {str(c).strip().lower(): c for c in df.columns}
+    for cand in candidates:
+        key = cand.strip().lower()
+        if key in cols_map:
+            return cols_map[key]
+    for cand in candidates:
+        key = cand.strip().lower()
+        for col_low, orig_col in cols_map.items():
+            if key in col_low:
+                return orig_col
+    if fallback_idx is not None and 0 <= fallback_idx < len(df.columns):
+        return df.columns[fallback_idx]
+    return None
 
 
 def short_splitter_label(full_name: str, prefixes: list[str]) -> str:
@@ -478,7 +499,7 @@ try:
 except Exception as e:
     print(f"❌ OLT файлини ўқишда хатолик: {e}")
 
-# 3b. Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalarini o'qish
+# 3b. Toma OLT_yangilangan_2.xlsx / Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalarini o'qish
 try:
     toma_eq_file = next((f for f in EXCEL_TOMA_EQUIPMENT_CANDIDATES if os.path.exists(f)), None)
     if toma_eq_file:
@@ -486,12 +507,19 @@ try:
         xls_teq = pd.ExcelFile(toma_eq_file)
         for s_name in xls_teq.sheet_names:
             df_teq = pd.read_excel(toma_eq_file, sheet_name=s_name)
-            for _, row in df_teq.iterrows():
-                set_name = " ".join(str(row.get("Set", "") or "").replace("\xa0", " ").split())
-                eq_num = " ".join(str(row.get("Nomer oborud.", "") or "").replace("\xa0", " ").split())
-                addr = " ".join(str(row.get("Adres ustanovki", "") or "").replace("\xa0", " ").split())
-                serial = " ".join(str(row.get("Seriyniy nomer", "") or "").replace("\xa0", " ").split())
+            set_col = pick_column(df_teq, ["Set", "Hudud", "Set / Hudud"], 0)
+            num_col = pick_column(df_teq, ["Nomer oborud.", "Kod / Port", "Kod porta", "Nomer"], 1)
+            addr_col = pick_column(df_teq, ["Adres ustanovki", "Uy manzili", "Manzil", "Adres"], 2)
+            ser_col = pick_column(df_teq, ["Seriyniy nomer", "Serial", "S/N"], None)
 
+            for _, row in df_teq.iterrows():
+                set_name = " ".join(str(row.get(set_col, "") if set_col else "").replace("\xa0", " ").split())
+                eq_num = " ".join(str(row.get(num_col, "") if num_col else "").replace("\xa0", " ").split())
+                addr = " ".join(str(row.get(addr_col, "") if addr_col else "").replace("\xa0", " ").split())
+                serial = " ".join(str(row.get(ser_col, "") if ser_col else "").replace("\xa0", " ").split())
+
+                if set_name.upper() == "JAMI OBYEKTLAR":
+                    continue
                 if eq_num and eq_num.lower() != "nan":
                     toma_equipment_list.append({
                         "set": set_name if set_name and set_name.lower() != "nan" else "OLT (Tomo)",
@@ -554,23 +582,33 @@ try:
 except Exception as e:
     print(f"❌ OLT Yosh kuch.xlsx файлини ўқишда хатолик: {e}")
 
-# 3e. Navoi.xlsx uskunalarini o'qish
+# 3e. Navoi_2.xlsx / Navoi.xlsx uskunalarini o'qish
 try:
-    if os.path.exists(EXCEL_NAVVOI_EQUIPMENT):
-        xls_nav = pd.ExcelFile(EXCEL_NAVVOI_EQUIPMENT)
+    nav_eq_file = next((f for f in EXCEL_NAVVOI_EQUIPMENT_CANDIDATES if os.path.exists(f)), None)
+    if nav_eq_file:
+        navoi_source_file = nav_eq_file
+        xls_nav = pd.ExcelFile(nav_eq_file)
         for s_name in xls_nav.sheet_names:
-            df_nav = pd.read_excel(EXCEL_NAVVOI_EQUIPMENT, sheet_name=s_name)
+            df_nav = pd.read_excel(nav_eq_file, sheet_name=s_name)
             for col_name in df_nav.columns:
                 c_low = str(col_name).strip().lower()
                 if "masharipov" in c_low or "montyor" in c_low or "mantyor" in c_low:
                     navoi_montyor = " ".join(str(col_name).split())
                     break
-            for _, row in df_nav.iterrows():
-                code_port = " ".join(str(row.get("Kod / Port", "") or "").replace("\xa0", " ").split())
-                repeat_code = " ".join(str(row.get("Kod / Port (Takror)", "") or "").replace("\xa0", " ").split())
-                hudud = " ".join(str(row.get("Set / Hudud", "") or "").replace("\xa0", " ").split())
-                addr = " ".join(str(row.get("Uy manzili", "") or "").replace("\xa0", " ").split())
 
+            code_col = pick_column(df_nav, ["Kod / Port", "Kod porta", "Nomer oborud.", "Kod"], 0)
+            rep_col = pick_column(df_nav, ["Kod / Port (Takror)", "Takror"], None)
+            hudud_col = pick_column(df_nav, ["Set / Hudud", "Set", "Hudud"], 2)
+            addr_col = pick_column(df_nav, ["Uy manzili", "Adres ustanovki", "Manzil", "Adres"], 3)
+
+            for _, row in df_nav.iterrows():
+                code_port = " ".join(str(row.get(code_col, "") if code_col else "").replace("\xa0", " ").split())
+                repeat_code = " ".join(str(row.get(rep_col, "") if rep_col else "").replace("\xa0", " ").split())
+                hudud = " ".join(str(row.get(hudud_col, "") if hudud_col else "").replace("\xa0", " ").split())
+                addr = " ".join(str(row.get(addr_col, "") if addr_col else "").replace("\xa0", " ").split())
+
+                if code_port.upper() == "JAMI OBYEKTLAR":
+                    continue
                 if code_port and code_port.lower() != "nan":
                     navoi_equipment_list.append({
                         "set": hudud if hudud and hudud.lower() != "nan" else "(Navoi)",
@@ -579,9 +617,9 @@ try:
                         "address": addr if addr and addr.lower() != "nan" else "-",
                         "montyor": navoi_montyor
                     })
-        print(f"✅ Navoi.xlsx юкланди: {len(navoi_equipment_list)} та (Монтёр: {navoi_montyor})")
+        print(f"✅ {nav_eq_file} юкланди: {len(navoi_equipment_list)} та (Монтёр: {navoi_montyor})")
 except Exception as e:
-    print(f"❌ Navoi.xlsx файлини ўқишда хатолик: {e}")
+    print(f"❌ Navoi файлини ўқишда хатолик: {e}")
 
 # 4. Muftalar bazasini yuklash
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
@@ -977,7 +1015,7 @@ def search_all_databases(query: str) -> str:
         if q in f"{sp['number']} {sp['splitter']} {sp['model']} {sp['address']} {sp['town']} {sp['real_sn']}".lower()
     ]
 
-    # 3b. Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalaridan qidirish
+    # 3b. Toma OLT_yangilangan_2.xlsx / Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalaridan qidirish
     toma_sp_hits = [
         e for e in toma_equipment_list
         if q in f"{e['set']} {e['number']} {e['address']} {e['serial']} {e.get('montyor', '')}".lower()
@@ -995,7 +1033,7 @@ def search_all_databases(query: str) -> str:
         if q in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
-    # 3e. Navoi.xlsx uskunalaridan qidirish
+    # 3e. Navoi_2.xlsx / Navoi.xlsx uskunalaridan qidirish
     navoi_sp_hits = [
         e for e in navoi_equipment_list
         if q in f"{e['set']} {e['number']} {e.get('repeat_code', '')} {e['address']} {e.get('montyor', '')}".lower()
@@ -1144,7 +1182,7 @@ async def cmd_stats(message: Message):
         f"• TOMA ускуналар ({html.quote(toma_source_file)}): <b>{len(toma_equipment_list)} та</b> (Монтёр: <b>{html.quote(toma_montyor)}</b>)\n"
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
-        f"• OLT Навои объектлар ({html.quote(EXCEL_NAVVOI_EQUIPMENT)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
+        f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• Муфталар: <b>{len(muftalar_list)} та</b>",
         reply_markup=keyboard
     )
