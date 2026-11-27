@@ -82,7 +82,7 @@ EXTRA_OLT_NAMES = [
     "Пахтагул",
 ]
 
-# Kod ichidagi tayyor muftalar bazasi (qidiruv va OLT ma'lumotlari uchun)
+# Kod ichidagi tayyor muftalar bazasi (OLT ma'lumotlari uchun)
 DEFAULT_MUFTALAR_LIST = [
     {
         "title": "Shodiyona ko'chasi Mufta",
@@ -660,7 +660,7 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [
             KeyboardButton(text="🌐 Интернет тарифлари"),
-            KeyboardButton(text="🔍 Абонент ва сплиттер қидириш")
+            KeyboardButton(text="🔍 Абонент қидириш")
         ],
         [
             KeyboardButton(text="🔌 Tayanch OLT"),
@@ -995,12 +995,13 @@ def format_extra_olt_summary(olt_name: str) -> str:
 def search_all_databases(query: str) -> str:
     q = query.lower().strip()
     if len(q) < 2:
-        return "⚠️ Қидирув учун камида 2 та белги киритинг."
+        return "⚠️ Абонент қидириш учун камида 2 та белги киритинг."
 
-    # 1. Tayanch va TOMA OLT portlaridan qidirish
+    # 1. OLT portlaridan faqat band abonentlar bo'yicha qidirish
     olt_hits = [
         p for p in (tayanch_olt_list + toma_olt_list)
-        if q in f"{p['splitter']} {p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']} {p.get('montyor', '')}".lower()
+        if p["client"] != "Бўш порт"
+        and q in f"{p['client']} {p['login']} {p['phone']} {p['ip_phone']} {p['ip']} {p['address']}".lower()
     ]
 
     # 2. Abonentlar bazasidan qidirish
@@ -1009,132 +1010,33 @@ def search_all_databases(query: str) -> str:
         if q in f"{s['client']} {s['login']} {s['phone']} {s['msisdn']} {s['address']}".lower()
     ]
 
-    # 3. Umumiy splitterlar bazasidan qidirish
-    sp_hits = [
-        sp for sp in splitters_list
-        if q in f"{sp['number']} {sp['splitter']} {sp['model']} {sp['address']} {sp['town']} {sp['real_sn']}".lower()
-    ]
+    if not olt_hits and not sub_hits:
+        return f"❌ <b>«{html.quote(query)}»</b> бўйича абонент топилмади."
 
-    # 3b. Toma OLT_yangilangan_2.xlsx / Toma OLT_yangilangan.xlsx / Toma OLT.xlsx uskunalaridan qidirish
-    toma_sp_hits = [
-        e for e in toma_equipment_list
-        if q in f"{e['set']} {e['number']} {e['address']} {e['serial']} {e.get('montyor', '')}".lower()
-    ]
-
-    # 3c. OLT_Xonkobod_tayyor.xlsx uskunalaridan qidirish
-    xonkobod_sp_hits = [
-        e for e in xonkobod_equipment_list
-        if q in f"{e['set']} {e['number']} {e['address']} {e['serial']} {e.get('montyor', '')}".lower()
-    ]
-
-    # 3d. OLT Yosh kuch.xlsx uskunalaridan qidirish
-    yosh_kuch_sp_hits = [
-        e for e in yosh_kuch_equipment_list
-        if q in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
-    ]
-
-    # 3e. Navoi_2.xlsx / Navoi.xlsx uskunalaridan qidirish
-    navoi_sp_hits = [
-        e for e in navoi_equipment_list
-        if q in f"{e['set']} {e['number']} {e.get('repeat_code', '')} {e['address']} {e.get('montyor', '')}".lower()
-    ]
-
-    # 4. Muftalardan qidirish
-    mufta_hits = [
-        m for m in muftalar_list
-        if q in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
-    ]
-
-    if not olt_hits and not sub_hits and not sp_hits and not toma_sp_hits and not xonkobod_sp_hits and not yosh_kuch_sp_hits and not navoi_sp_hits and not mufta_hits:
-        return f"❌ <b>«{html.quote(query)}»</b> бўйича ҳеч нарса топилмади."
-
-    out = [f"🔎 <b>Қидирув натижалари («{html.quote(query)}»):</b>"]
-
-    if olt_hits:
-        out.append(f"\n🔌 <b>OLT портларида ({len(olt_hits)} та):</b>")
-        for p in olt_hits[:10]:
-            extra = []
-            if p["ip_phone"] != "-":
-                extra.append(f"IP-тел: {html.quote(p['ip_phone'])}")
-            if p["ip"] != "-":
-                extra.append(f"IP: <code>{html.quote(p['ip'])}</code>")
-            if p.get("montyor"):
-                extra.append(f"👷 {html.quote(p['montyor'])}")
-            extra_str = f" | {' | '.join(extra)}" if extra else ""
-            out.append(
-                f"• <b>{html.quote(p['splitter'])}</b> ({html.quote(p['port'])}-порт) — <b>{html.quote(p['client'])}</b>\n"
-                f"  🔑 <code>{html.quote(p['login'])}</code> | 📞 {html.quote(p['phone'])}{extra_str}\n"
-                f"  🏠 {html.quote(p['address'])}"
-            )
+    out = [f"🔎 <b>Абонент қидируви натижалари («{html.quote(query)}»):</b>"]
 
     if sub_hits:
         out.append(f"\n👥 <b>Абонентлар базасида ({len(sub_hits)} та):</b>")
-        for s in sub_hits[:6]:
+        for s in sub_hits[:8]:
             out.append(
                 f"• <b>{html.quote(s['client'])}</b> (<code>{html.quote(s['login'])}</code>)\n"
                 f"  📞 {html.quote(s['phone'])} | Тариф: {html.quote(s['rate_plan'])} | Баланс: {html.quote(s['balance'])}\n"
                 f"  🏠 {html.quote(s['address'])}"
             )
 
-    if sp_hits:
-        out.append(f"\n⚡ <b>Сплиттерлар базасида ({len(sp_hits)} та):</b>")
-        for sp in sp_hits[:5]:
+    if olt_hits:
+        out.append(f"\n🔌 <b>OLT абонентларида ({len(olt_hits)} та):</b>")
+        for p in olt_hits[:10]:
+            extra = []
+            if p["ip_phone"] != "-":
+                extra.append(f"IP-тел: {html.quote(p['ip_phone'])}")
+            if p["ip"] != "-":
+                extra.append(f"IP: <code>{html.quote(p['ip'])}</code>")
+            extra_str = f" | {' | '.join(extra)}" if extra else ""
             out.append(
-                f"• <b>{html.quote(sp['number'])}</b> ({html.quote(sp['splitter'])} / {html.quote(sp['model'])})\n"
-                f"  📍 {html.quote(sp['town'])}, {html.quote(sp['address'])} | S/N: <code>{html.quote(sp['real_sn'])}</code>"
-            )
-
-    if toma_sp_hits:
-        out.append(
-            f"\n📡 <b>TOMA ускуналарида ({len(toma_sp_hits)} та)</b> "
-            f"| 👷 Монтёр: <b>{html.quote(toma_montyor)}</b>:"
-        )
-        for e in toma_sp_hits[:8]:
-            serial_part = f"🔢 S/N: <code>{html.quote(e['serial'])}</code> | " if e["serial"] != "-" else ""
-            out.append(
-                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
-                f"  {serial_part}🏠 {html.quote(e['address'])}"
-            )
-
-    if xonkobod_sp_hits:
-        out.append(
-            f"\n📡 <b>OLT Xonkobod ускуналарида ({len(xonkobod_sp_hits)} та)</b> "
-            f"| 👷 Монтёр: <b>{html.quote(xonkobod_montyor)}</b>:"
-        )
-        for e in xonkobod_sp_hits[:8]:
-            out.append(
-                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
-                f"  🏠 {html.quote(e['address'])}"
-            )
-
-    if yosh_kuch_sp_hits:
-        out.append(
-            f"\n📡 <b>OLT Yosh kuch объектларида ({len(yosh_kuch_sp_hits)} та)</b> "
-            f"| 👷 Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>:"
-        )
-        for e in yosh_kuch_sp_hits[:8]:
-            out.append(
-                f"• <b>{html.quote(e['number'])}</b> ({html.quote(e['set'])})\n"
-                f"  🏠 {html.quote(e['address'])}"
-            )
-
-    if navoi_sp_hits:
-        out.append(
-            f"\n📡 <b>OLT Навои объектларида ({len(navoi_sp_hits)} та)</b> "
-            f"| 👷 Монтёр: <b>{html.quote(navoi_montyor)}</b>:"
-        )
-        for e in navoi_sp_hits[:8]:
-            out.append(
-                f"• <b>{html.quote(e['number'])}</b> {html.quote(e['set'])}\n"
-                f"  🏠 {html.quote(e['address'])}"
-            )
-
-    if mufta_hits:
-        out.append(f"\n🧵 <b>Муфталарда ({len(mufta_hits)} та):</b>")
-        for m in mufta_hits[:5]:
-            out.append(
-                f"• <b>{html.quote(m['title'])}</b>\n"
-                f"  🏠 {html.quote(', '.join(m['addresses'][:3]))}"
+                f"• <b>{html.quote(p['client'])}</b> ({html.quote(p['splitter'])} — {html.quote(p['port'])}-порт)\n"
+                f"  🔑 <code>{html.quote(p['login'])}</code> | 📞 {html.quote(p['phone'])}{extra_str}\n"
+                f"  🏠 {html.quote(p['address'])}"
             )
 
     return "\n".join(out)
@@ -1166,7 +1068,7 @@ async def cmd_start(message: Message):
     await message.answer(
         "👋 Ассалому алайкум!\n"
         "<b>Хонқа тумани</b> оптик тармоқ, OLT, сплиттер, абонент ва монтёрлар маълумот базаси ботига хуш келибсиз.\n\n"
-        "Қуйидаги менюдан керакли бўлимни танланг ёки қидирув сўзини (Ф.И.Ш., логин, телефон, манзил ёки порт/ускуна рақами) ёзинг.",
+        "Қуйидаги менюдан керакли бўлимни танланг ёки абонент қидириш учун Ф.И.Ш., логин, телефон ёки манзил ёзинг.",
         reply_markup=keyboard
     )
 
@@ -1201,14 +1103,13 @@ async def show_tariffs(message: Message):
     )
 
 
-@dp.message(F.text == "🔍 Абонент ва сплиттер қидириш")
+@dp.message(F.text == "🔍 Абонент қидириш")
 async def prompt_search(message: Message):
     await message.answer(
-        "🔍 <b>Қидирув учун сўз киритинг:</b>\n"
+        "🔍 <b>Абонент қидириш учун маълумот киритинг:</b>\n"
         "• Абонент Ф.И.Ш. ёки логини\n"
-        "• Телефон ёки IP-манзил\n"
-        "• Кўча / маҳалла / уй манзили\n"
-        "• Сплиттер ёки ускуна рақами (масалан: <code>1/1 1x4</code>, <code>1/1/1</code>, <code>Navxos</code>)",
+        "• Телефон рақами ёки IP-манзил\n"
+        "• Кўча / маҳалла / уй манзили",
         reply_markup=keyboard
     )
 
