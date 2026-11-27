@@ -51,6 +51,7 @@ EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
 ]
 EXCEL_MARKAZ2 = "Markaz 2.xlsx"
 EXCEL_DURVADIK = "Durvadik.xlsx"
+EXCEL_PAXTAKOR = "OLT Paxtakor.xlsx"
 
 # Qo‘shimcha OLT ro‘yxati (tugmalar uchun)
 EXTRA_OLT_NAMES = [
@@ -110,6 +111,10 @@ markaz2_scheme_list = []
 # OLT Durvadik ma'lumotlari va montyori
 durvadik_list = []
 durvadik_montyor = "Ruslan Jumaniyazov"
+
+# OLT Paxtakor ma'lumotlari va montyori
+paxtakor_list = []
+paxtakor_montyor = "Bobojonov Iskandar"
 
 
 def clean_phone(val) -> str:
@@ -518,6 +523,52 @@ try:
 except Exception as e:
     print(f"❌ Durvadik.xlsx файлини ўқишда хатолик: {e}")
 
+# 3h. OLT Paxtakor.xlsx ma'lumotlarini o'qish
+try:
+    if os.path.exists(EXCEL_PAXTAKOR):
+        xls_paxt = pd.ExcelFile(EXCEL_PAXTAKOR)
+        for s_name in xls_paxt.sheet_names:
+            df_paxt = pd.read_excel(EXCEL_PAXTAKOR, sheet_name=s_name)
+            for r_idx in range(df_paxt.shape[0]):
+                for c_idx in range(df_paxt.shape[1]):
+                    v_cell = df_paxt.iat[r_idx, c_idx]
+                    if pd.notna(v_cell):
+                        sv = " ".join(str(v_cell).replace("\xa0", " ").split())
+                        if "elektramont" in sv.lower() or "mantyor" in sv.lower() or "montyor" in sv.lower():
+                            parts_m = sv.split(":", 1)
+                            if len(parts_m) == 2 and parts_m[1].strip():
+                                paxtakor_montyor = parts_m[1].strip()
+
+            tr_col = pick_column(df_paxt, ["T/r", "№", "Nomer"], 0)
+            set_col = pick_column(df_paxt, ["Set", "Hudud"], 1)
+            sp_col = pick_column(df_paxt, ["Splitter (Bittadan)", "Splitter", "Spllikter", "Kod / Port"], 2)
+            addr_col = pick_column(df_paxt, ["Uy manzili", "Manzil", "Adres ustanovki"], 3)
+
+            for _, row in df_paxt.iterrows():
+                tr_raw = row.get(tr_col) if tr_col else None
+                tr_val = "-"
+                if pd.notna(tr_raw) and str(tr_raw).strip() and str(tr_raw).strip().lower() != "nan":
+                    try:
+                        tr_val = str(int(float(tr_raw)))
+                    except (ValueError, TypeError):
+                        tr_val = " ".join(str(tr_raw).replace("\xa0", " ").split())
+
+                set_val = " ".join(str(row.get(set_col, "") if set_col else "").replace("\xa0", " ").split())
+                sp_val = " ".join(str(row.get(sp_col, "") if sp_col else "").replace("\xa0", " ").split())
+                addr_val = " ".join(str(row.get(addr_col, "") if addr_col else "").replace("\xa0", " ").split())
+
+                if sp_val and sp_val.lower() != "nan":
+                    paxtakor_list.append({
+                        "tr": tr_val,
+                        "set": set_val if set_val and set_val.lower() != "nan" else "OLT Paxtakor",
+                        "number": sp_val,
+                        "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
+                        "montyor": paxtakor_montyor
+                    })
+        print(f"✅ OLT Paxtakor.xlsx юкланди: {len(paxtakor_list)} та (Монтёр: {paxtakor_montyor})")
+except Exception as e:
+    print(f"❌ OLT Paxtakor.xlsx файлини ўқишда хатолик: {e}")
+
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
     "elect_2": {"name": "Отабоев Рамзиддин Рахматилло угли", "phone": "+998995603938", "zone": "Хонқа тумани, Пахтакор МФЙ", "task": "Бетон столбаларда ишлаш, drop кабель тортиш ва роутерларни созлаш."},
@@ -822,6 +873,42 @@ def format_durvadik_page_text(page: int, page_size: int = 15) -> tuple[str, int]
     return "\n".join(lines), page
 
 
+def build_paxtakor_page_keyboard(page: int, page_size: int = 15) -> InlineKeyboardMarkup:
+    total_items = len(paxtakor_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Олдинги", callback_data=f"paxt_pg_{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"📄 {page + 1}/{total_pages}", callback_data="paxt_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Кейинги ➡️", callback_data=f"paxt_pg_{page + 1}"))
+
+    return InlineKeyboardMarkup(inline_keyboard=[nav_row])
+
+
+def format_paxtakor_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
+    total_items = len(paxtakor_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    start_idx = page * page_size
+    end_idx = min(start_idx + page_size, total_items)
+
+    lines = [
+        f"🏢 <b>OLT Пахтакор</b> (Жами: <b>{total_items} та</b> | Саҳифа {page + 1}/{total_pages})\n"
+        f"👷 Электромонтёр: <b>{html.quote(paxtakor_montyor)}</b>\n"
+    ]
+    for item in paxtakor_list[start_idx:end_idx]:
+        tr_part = f" [T/r: {html.quote(item['tr'])}]" if item.get("tr") and item["tr"] != "-" else ""
+        lines.append(
+            f"• <b>{html.quote(item['number'])}</b>{tr_part} {html.quote(item['set'])}\n"
+            f"  🏠 {html.quote(item['address'])}"
+        )
+    return "\n".join(lines), page
+
+
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
@@ -850,6 +937,11 @@ def format_extra_olt_summary(olt_name: str) -> str:
     matched_durvadik = [
         e for e in durvadik_list
         if kw in ("дурвадик", "durvadik")
+        or kw in f"{e['set']} {e['number']} {e['address']} {e.get('montyor', '')}".lower()
+    ]
+    matched_paxtakor = [
+        e for e in paxtakor_list
+        if kw in ("пахтакор", "paxtakor")
         or kw in f"{e['set']} {e['number']} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
@@ -915,7 +1007,26 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"  🏠 {html.quote(e['address'])}"
             )
 
-    if not matched_ports and not matched_splitters and not matched_xonkobod and not matched_yosh_kuch and not matched_navoi and not matched_durvadik:
+    if matched_paxtakor and kw not in ("пахтакор", "paxtakor"):
+        lines.append(
+            f"\n📡 <b>OLT Пахтакор объектларида ({len(matched_paxtakor)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(paxtakor_montyor)}</b>:\n"
+        )
+        for e in matched_paxtakor[:8]:
+            lines.append(
+                f"• <b>{html.quote(e['number'])}</b> {html.quote(e['set'])}\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
+    if (
+        not matched_ports
+        and not matched_splitters
+        and not matched_xonkobod
+        and not matched_yosh_kuch
+        and not matched_navoi
+        and not matched_durvadik
+        and not matched_paxtakor
+    ):
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -1015,7 +1126,8 @@ async def cmd_stats(message: Message):
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
-        f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)",
+        f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)\n"
+        f"• OLT Пахтакор объектлар: <b>{len(paxtakor_list)} та</b> (Монтёр: <b>{html.quote(paxtakor_montyor)}</b>)",
         reply_markup=keyboard
     )
 
@@ -1275,6 +1387,26 @@ async def cb_durvadik_pagination(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data.startswith("paxt_"))
+async def cb_paxtakor_pagination(callback: CallbackQuery):
+    if callback.data == "paxt_noop":
+        await callback.answer()
+        return
+
+    if callback.data.startswith("paxt_pg_"):
+        try:
+            page = int(callback.data.split("_")[2])
+        except ValueError:
+            page = 0
+        text, current_page = format_paxtakor_page_text(page)
+        mk = build_paxtakor_page_keyboard(current_page)
+        await callback.message.edit_text(text, reply_markup=mk)
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+
 @dp.message(F.text)
 async def handle_text(message: Message):
     txt = message.text.strip()
@@ -1299,6 +1431,12 @@ async def handle_text(message: Message):
         if olt_name.lower() in ("дурвадик", "durvadik") and durvadik_list:
             text, page = format_durvadik_page_text(0)
             mk = build_durvadik_page_keyboard(page)
+            await message.answer(text, reply_markup=mk)
+            return
+
+        if olt_name.lower() in ("пахтакор", "paxtakor") and paxtakor_list:
+            text, page = format_paxtakor_page_text(0)
+            mk = build_paxtakor_page_keyboard(page)
             await message.answer(text, reply_markup=mk)
             return
 
