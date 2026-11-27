@@ -50,19 +50,7 @@ EXCEL_NAVVOI_EQUIPMENT_CANDIDATES = [
     "Navoi.xlsx",
 ]
 EXCEL_MARKAZ2 = "Markaz 2.xlsx"
-
-MUFTA_FILES = [
-    "Shodiyona ko’chasi Mufta.xlsx",
-    "А.Қаҳҳор кўчаси 47-уй Муфта.xlsx",
-    "Гайрат махалласи Узумзор 59-уй.xlsx",
-    "Гулобод Муфта сарапаён.xlsx",
-    "Дала шипон Муфма.xlsx",
-    "Дўрмон кўчаси, 1 уй.xlsx",
-    "Дўстлик кўчаси 23-уй Муфта.xlsx",
-    "Жайхун қуёши болалар оромгоҳига олиб борувчи йўл.xlsx",
-    "Кутлткадам муфта.xlsx",
-    "Қорақош 9-мактаб Наврўз кўчаси дом. 45.xlsx",
-]
+EXCEL_DURVADIK = "Durvadik.xlsx"
 
 # Qo‘shimcha OLT ro‘yxati (tugmalar uchun)
 EXTRA_OLT_NAMES = [
@@ -83,154 +71,8 @@ EXTRA_OLT_NAMES = [
     "Пахтагул",
 ]
 
-# Kod ichidagi tayyor muftalar bazasi (OLT ma'lumotlari uchun)
-DEFAULT_MUFTALAR_LIST = [
-    {
-        "title": "Shodiyona ko'chasi Mufta",
-        "sheets": ["Shodiyona ko’chasi"],
-        "addresses": [
-            "Xonqa tumani Istiqlol maxallasi Shodiyona ko’chasi 36-uy",
-            "Shodiyona ko’chasi 10-uy",
-            "Shodiyona ko’chasi 76-uy",
-            "Shodiyona ko’chasi 38-uy"
-        ],
-        "cables": ["Mavjud FIG-8 Aerial Loose Tube Cable G.652D 8F"],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "А.Қаҳҳор кўчаси 47-уй Муфта",
-        "sheets": ["Хонқобод махалласи"],
-        "addresses": [
-            "Хонқа туман Порлоқ махалласи А.Қаҳҳор кўчаси 47-уй",
-            "А.Қаҳҳор кўчаси 47-уй"
-        ],
-        "cables": [
-            "FIG-8 Aerial Loose Tube Cable G.652D 6F 6.6*12.7",
-            "NXTС8S-8B1.3 138 м"
-        ],
-        "meta": [
-            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
-            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
-        ]
-    },
-    {
-        "title": "Ғайрат махалласи Узумзор 59-уй",
-        "sheets": ["Гайрат махалласи Узумзор 59-уй"],
-        "addresses": [
-            "Хонқа туман Гайрат махалласи Узумзор кўчаси 59-уй",
-            "Хонқа туман Гайрат махалласи Узумзор кўчаси 96-уй",
-            "Умид ниҳоллари кўчаси, 28 уй Қорақош (Ленин) қишлоғи"
-        ],
-        "cables": ["NXTС8S-8B1.3 1.7mm"],
-        "meta": [
-            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
-            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
-        ]
-    },
-    {
-        "title": "Гулобод Муфта (Сарапаён)",
-        "sheets": ["Гулобод Муфта", "Гулобод Муфта 2"],
-        "addresses": [
-            "Хонқа туман Истиқлол махалласи Гулобод кўчаси 37-уй",
-            "Хонқа туман Истиқлол махалласи Гулзор кўчаси 4-уй",
-            "Хонқа тумани Сарапаян қишлоғи Истиқлол махалласи Дўстлик кўчаси 23-уй",
-            "Гулобод кўчаси 43-уй, 79-уй"
-        ],
-        "cables": [
-            "NJXTA-32B1.3",
-            "FIG-8 Aerial Loose Tube Cable G.652D 12F",
-            "NJXTW-8B1.3",
-            "NXTC8S-12B1.3 ОКТцМ-П-8Е (1х8)-1.5 kH"
-        ],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "Дала шипон Муфта (1 ва 2)",
-        "sheets": ["Дала шипон Муфма 1", "Дала шипон Муфта 2"],
-        "addresses": [
-            "Қутлуғқадам 1-уй, Томадурвадик қишлоғи",
-            "Қутлиқадам кўчаси 1-уй"
-        ],
-        "cables": [
-            "NXTC8S-48B1.3",
-            "ВОК-48 воздушный (FIG-8 Aerial Armored Optical Fiber Cable G.652D 48F 9.6*15.7)"
-        ],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "Дўрмон кўчаси, 1-уй Муфта",
-        "sheets": ["Дўрмон кўчаси, 1 уй", "4-5-6"],
-        "addresses": [
-            "Дўрмон кўчаси, 1 уй Қирқёп қишлоғи",
-            "Дўрмон кўчаси, 7 уй Қирқёп қишлоғи",
-            "Хонка Темирчилар кўчаси, 6 уй Қирқёп қишлоғи",
-            "Юксалиш кўчаси, 49 уй Қирқёп қишлоғи"
-        ],
-        "cables": [
-            "NJXTA-48B1.3",
-            "FIG-8 Aerial Tube Cable G.652D 6F",
-            "ОКНСМ-10-01-0,22-12"
-        ],
-        "meta": [
-            "Паспорт 2024 йилнинг 02 апрел куни тузилган",
-            "№ 1-муфта (переходная), 12.01.2024 йилда пайвандланган"
-        ]
-    },
-    {
-        "title": "Дўстлик кўчаси 23-уй Муфта",
-        "sheets": ["Гулобод Муфта"],
-        "addresses": [
-            "Хонқа туман Истиқлол махалласи Гулобод кўчаси 23-уй",
-            "Хоразм вилояти, Хонқа тумани, Сарапоён қишлоғи, Дўстлик кўчаси дом 76"
-        ],
-        "cables": ["NJXTW-8B1.3"],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "Жайхун қуёши болалар оромгоҳи йўли",
-        "sheets": ["Жайхун қуёши болалар оромгоҳига"],
-        "addresses": [
-            "Хонқа туман Томадургадик қишлоғи Жайхун қуёши болалар оромгоҳига олиб борувчи йўл"
-        ],
-        "cables": [
-            "NXTC8S-12B1.3",
-            "FIG-8 Aerial Loose Tube Cable 6F 546 м"
-        ],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "Қутлуғқадам муфта",
-        "sheets": ["Лист1"],
-        "addresses": [
-            "Қутлуғқадам кўчаси, 62 уй Томадурвадик қишлоғи",
-            "Қутлиқадам кўчаси 1-уй",
-            "Мустақиллик кўчаси 45"
-        ],
-        "cables": [
-            "NXTA-32B1.3",
-            "NXTC8S-24B1.3",
-            "ОКТ-П-48Е- (4х12)-6кН"
-        ],
-        "meta": ["Паспорт 2024 йилнинг 29 март куни тузилган"]
-    },
-    {
-        "title": "Қорақош 9-мактаб Наврўз кўчаси дом 45",
-        "sheets": ["Лист1"],
-        "addresses": [
-            "Хоразм вилояти, Хонқа тумани, Қорақош (Ленин) қишлоғи, Наврўз кўчаси дом 45",
-            "Наврўз кўчаси, 44 уй Қорақош (Ленин) қишлоғи"
-        ],
-        "cables": [
-            "NXTС8S-48B1.3 1.7mm",
-            "NXTC8S-48B1.3"
-        ],
-        "meta": ["Паспорт 2024 йилнинг Апрел куни тузилган"]
-    }
-]
-
 splitters_list = []
 subscribers_list = []
-muftalar_list = []
 
 # Tayanch OLT ma'lumotlari va montyori
 tayanch_olt_list = []
@@ -264,6 +106,10 @@ markaz2_olt_list = []
 markaz2_splitters_order = []
 markaz2_by_splitter = {}
 markaz2_scheme_list = []
+
+# OLT Durvadik ma'lumotlari va montyori
+durvadik_list = []
+durvadik_montyor = "Ruslan Jumaniyazov"
 
 
 def clean_phone(val) -> str:
@@ -384,46 +230,6 @@ def parse_olt_sheet(df_sheet: pd.DataFrame, default_montyor: str = "") -> tuple[
         by_sp_out[current_splitter].append(entry)
 
     return ports_out, order_out, by_sp_out, detected_montyor
-
-
-def parse_mufta_workbook(fpath: str) -> dict | None:
-    try:
-        xls = pd.ExcelFile(fpath)
-        addresses = []
-        cables = []
-        meta = []
-        sheets = [s.strip() for s in xls.sheet_names]
-        for s in xls.sheet_names:
-            df = pd.read_excel(fpath, sheet_name=s, header=None)
-            for r in range(df.shape[0]):
-                for c in range(df.shape[1]):
-                    v = df.iat[r, c]
-                    if pd.isna(v):
-                        continue
-                    sv = " ".join(str(v).split())
-                    low = sv.lower()
-                    if "манзил:" in low or "қишлоғ" in low or "кўчаси" in low or "махалласи" in low:
-                        val = sv.split(":", 1)[1].strip() if ":" in sv else sv
-                        if val and val not in addresses:
-                            addresses.append(val)
-                    elif "маркаси:" in low or "cable" in low or "nx" in low or "вок-" in low or "окт" in low or "окнсм" in low:
-                        val = sv.split(":", 1)[1].strip() if ":" in sv else sv
-                        if val and len(val) > 3 and val not in cables:
-                            cables.append(val)
-                    elif "паспорт 20" in low or "муфтанинг техник" in low or "пайвандланган" in low:
-                        if sv not in meta:
-                            meta.append(sv)
-        title = os.path.splitext(os.path.basename(fpath))[0]
-        return {
-            "title": title,
-            "sheets": sheets,
-            "addresses": addresses,
-            "cables": cables,
-            "meta": meta
-        }
-    except Exception as e:
-        print(f"❌ Муфта файлини ўқишда хатолик ({fpath}): {e}")
-        return None
 
 
 # 1. Splitters bazasini o'qish
@@ -666,17 +472,51 @@ try:
 except Exception as e:
     print(f"❌ Markaz 2.xlsx файлини ўқишда хатолик: {e}")
 
-# 4. Muftalar bazasini yuklash
-existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
-if existing_mufta_files:
-    for mf in existing_mufta_files:
-        parsed = parse_mufta_workbook(mf)
-        if parsed:
-            muftalar_list.append(parsed)
-    print(f"✅ Муфталар файллардан юкланди: {len(muftalar_list)} та")
-else:
-    muftalar_list = list(DEFAULT_MUFTALAR_LIST)
-    print(f"✅ Муфталар захира базадан юкланди: {len(muftalar_list)} та")
+# 3g. Durvadik.xlsx ma'lumotlarini o'qish
+try:
+    if os.path.exists(EXCEL_DURVADIK):
+        xls_durv = pd.ExcelFile(EXCEL_DURVADIK)
+        for s_name in xls_durv.sheet_names:
+            df_durv = pd.read_excel(EXCEL_DURVADIK, sheet_name=s_name)
+            for r_idx in range(df_durv.shape[0]):
+                for c_idx in range(df_durv.shape[1]):
+                    v_cell = df_durv.iat[r_idx, c_idx]
+                    if pd.notna(v_cell):
+                        sv = " ".join(str(v_cell).replace("\xa0", " ").split())
+                        if "elektramont" in sv.lower() or "montyor" in sv.lower() or "mantyor" in sv.lower():
+                            parts_m = sv.split(":", 1)
+                            if len(parts_m) == 2 and parts_m[1].strip():
+                                durvadik_montyor = parts_m[1].strip()
+
+            tr_col = pick_column(df_durv, ["T/r", "№", "Nomer"], 0)
+            set_col = pick_column(df_durv, ["Set", "Hudud"], 1)
+            sp_col = pick_column(df_durv, ["Splitter (Bittadan)", "Splitter", "Spllikter", "Kod / Port"], 2)
+            addr_col = pick_column(df_durv, ["Uy manzili", "Manzil", "Adres ustanovki"], 3)
+
+            for _, row in df_durv.iterrows():
+                tr_raw = row.get(tr_col) if tr_col else None
+                tr_val = "-"
+                if pd.notna(tr_raw) and str(tr_raw).strip() and str(tr_raw).strip().lower() != "nan":
+                    try:
+                        tr_val = str(int(float(tr_raw)))
+                    except (ValueError, TypeError):
+                        tr_val = " ".join(str(tr_raw).replace("\xa0", " ").split())
+
+                set_val = " ".join(str(row.get(set_col, "") if set_col else "").replace("\xa0", " ").split())
+                sp_val = " ".join(str(row.get(sp_col, "") if sp_col else "").replace("\xa0", " ").split())
+                addr_val = " ".join(str(row.get(addr_col, "") if addr_col else "").replace("\xa0", " ").split())
+
+                if sp_val and sp_val.lower() != "nan":
+                    durvadik_list.append({
+                        "tr": tr_val,
+                        "set": set_val if set_val and set_val.lower() != "nan" else "(Durvadik)",
+                        "number": sp_val,
+                        "address": addr_val if addr_val and addr_val.lower() != "nan" else "-",
+                        "montyor": durvadik_montyor
+                    })
+        print(f"✅ Durvadik.xlsx юкланди: {len(durvadik_list)} та (Монтёр: {durvadik_montyor})")
+except Exception as e:
+    print(f"❌ Durvadik.xlsx файлини ўқишда хатолик: {e}")
 
 ELECTRICIANS_DATA = {
     "elect_1": {"name": "Шоназаров Достон Хайитбоевич", "phone": "+998995054885", "zone": "Хонқа тумани, Марказий МФЙ", "task": "Оптик тармоқларни тортиш, сварка қилиш ва абонентларни улаш."},
@@ -946,6 +786,42 @@ def format_navoi_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
     return "\n".join(lines), page
 
 
+def build_durvadik_page_keyboard(page: int, page_size: int = 15) -> InlineKeyboardMarkup:
+    total_items = len(durvadik_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Олдинги", callback_data=f"durv_pg_{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"📄 {page + 1}/{total_pages}", callback_data="durv_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Кейинги ➡️", callback_data=f"durv_pg_{page + 1}"))
+
+    return InlineKeyboardMarkup(inline_keyboard=[nav_row])
+
+
+def format_durvadik_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
+    total_items = len(durvadik_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    start_idx = page * page_size
+    end_idx = min(start_idx + page_size, total_items)
+
+    lines = [
+        f"🏢 <b>OLT Дурвадик</b> (Жами: <b>{total_items} та</b> | Саҳифа {page + 1}/{total_pages})\n"
+        f"👷 Электромонтёр: <b>{html.quote(durvadik_montyor)}</b>\n"
+    ]
+    for item in durvadik_list[start_idx:end_idx]:
+        tr_part = f" [T/r: {html.quote(item['tr'])}]" if item.get("tr") and item["tr"] != "-" else ""
+        lines.append(
+            f"• <b>{html.quote(item['number'])}</b>{tr_part} {html.quote(item['set'])}\n"
+            f"  🏠 {html.quote(item['address'])}"
+        )
+    return "\n".join(lines), page
+
+
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
@@ -955,10 +831,6 @@ def format_extra_olt_summary(olt_name: str) -> str:
     matched_splitters = [
         s for s in splitters_list
         if kw in f"{s['number']} {s['splitter']} {s['model']} {s['address']} {s['town']} {s['real_sn']}".lower()
-    ]
-    matched_muftalar = [
-        m for m in muftalar_list
-        if kw in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
     ]
     matched_xonkobod = [
         e for e in xonkobod_equipment_list
@@ -974,6 +846,11 @@ def format_extra_olt_summary(olt_name: str) -> str:
         e for e in navoi_equipment_list
         if kw in ("навои", "navoi", "навхос", "navxos")
         or kw in f"{e['set']} {e['number']} {e.get('repeat_code', '')} {e['address']} {e.get('montyor', '')}".lower()
+    ]
+    matched_durvadik = [
+        e for e in durvadik_list
+        if kw in ("дурвадик", "durvadik")
+        or kw in f"{e['set']} {e['number']} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
     lines = [f"🏢 <b>OLT: {html.quote(olt_name)}</b>"]
@@ -993,10 +870,6 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"📍 <b>{html.quote(s['town'])}</b> — <b>{html.quote(s['number'])}</b> ({html.quote(s['splitter'])} / {html.quote(s['model'])})\n"
                 f"   🏠 Манзил: {html.quote(s['address'])} | S/N: <code>{html.quote(s['real_sn'])}</code>"
             )
-    if matched_muftalar:
-        lines.append(f"\n🧵 Муфталар базасида топилди: <b>{len(matched_muftalar)} та</b>\n")
-        for m in matched_muftalar[:3]:
-            lines.append(f"   • <b>{html.quote(m['title'])}</b> — {html.quote(', '.join(m['addresses'][:2]))}")
 
     if matched_xonkobod and kw not in ("хонкобод", "xonkobod"):
         lines.append(
@@ -1031,7 +904,18 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"  🏠 {html.quote(e['address'])}"
             )
 
-    if not matched_ports and not matched_splitters and not matched_muftalar and not matched_xonkobod and not matched_yosh_kuch and not matched_navoi:
+    if matched_durvadik and kw not in ("дурвадик", "durvadik"):
+        lines.append(
+            f"\n📡 <b>OLT Дурвадик объектларида ({len(matched_durvadik)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(durvadik_montyor)}</b>:\n"
+        )
+        for e in matched_durvadik[:8]:
+            lines.append(
+                f"• <b>{html.quote(e['number'])}</b> {html.quote(e['set'])}\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
+    if not matched_ports and not matched_splitters and not matched_xonkobod and not matched_yosh_kuch and not matched_navoi and not matched_durvadik:
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -1131,7 +1015,7 @@ async def cmd_stats(message: Message):
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
         f"• OLT Навои объектлар ({html.quote(navoi_source_file)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• OLT Марказ2 сплиттерлар: <b>{len(markaz2_splitters_order)} та</b> ({len(markaz2_olt_list)} порт, {len(markaz2_scheme_list)} схема)\n"
-        f"• Муфталар: <b>{len(muftalar_list)} та</b>",
+        f"• OLT Дурвадик объектлар: <b>{len(durvadik_list)} та</b> (Монтёр: <b>{html.quote(durvadik_montyor)}</b>)",
         reply_markup=keyboard
     )
 
@@ -1371,6 +1255,26 @@ async def cb_navoi_pagination(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data.startswith("durv_"))
+async def cb_durvadik_pagination(callback: CallbackQuery):
+    if callback.data == "durv_noop":
+        await callback.answer()
+        return
+
+    if callback.data.startswith("durv_pg_"):
+        try:
+            page = int(callback.data.split("_")[2])
+        except ValueError:
+            page = 0
+        text, current_page = format_durvadik_page_text(page)
+        mk = build_durvadik_page_keyboard(current_page)
+        await callback.message.edit_text(text, reply_markup=mk)
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+
 @dp.message(F.text)
 async def handle_text(message: Message):
     txt = message.text.strip()
@@ -1390,6 +1294,12 @@ async def handle_text(message: Message):
                 "Сплиттерни танланг:",
                 reply_markup=mk
             )
+            return
+
+        if olt_name.lower() in ("дурвадик", "durvadik") and durvadik_list:
+            text, page = format_durvadik_page_text(0)
+            mk = build_durvadik_page_keyboard(page)
+            await message.answer(text, reply_markup=mk)
             return
 
         if olt_name.lower() in ("хонкобод", "xonkobod") and xonkobod_equipment_list:
