@@ -44,6 +44,7 @@ EXCEL_TOMA_EQUIPMENT_CANDIDATES = [
 ]
 EXCEL_XONKOBOD_EQUIPMENT = "OLT_Xonkobod_tayyor.xlsx"
 EXCEL_YOSH_KUCH_EQUIPMENT = "OLT Yosh kuch.xlsx"
+EXCEL_NAVVOI_EQUIPMENT = "Navoi.xlsx"
 
 MUFTA_FILES = [
     "Shodiyona ko’chasi Mufta.xlsx",
@@ -247,6 +248,10 @@ xonkobod_montyor = "Yusupov Bobur"
 # OLT Yosh kuch uskunalari va montyori
 yosh_kuch_equipment_list = []
 yosh_kuch_montyor = "Yo'ldashov Qadamboy"
+
+# OLT Navoi uskunalari va montyori
+navoi_equipment_list = []
+navoi_montyor = "ALI MASHARIPOV"
 
 
 def clean_phone(val) -> str:
@@ -549,6 +554,35 @@ try:
 except Exception as e:
     print(f"❌ OLT Yosh kuch.xlsx файлини ўқишда хатолик: {e}")
 
+# 3e. Navoi.xlsx uskunalarini o'qish
+try:
+    if os.path.exists(EXCEL_NAVVOI_EQUIPMENT):
+        xls_nav = pd.ExcelFile(EXCEL_NAVVOI_EQUIPMENT)
+        for s_name in xls_nav.sheet_names:
+            df_nav = pd.read_excel(EXCEL_NAVVOI_EQUIPMENT, sheet_name=s_name)
+            for col_name in df_nav.columns:
+                c_low = str(col_name).strip().lower()
+                if "masharipov" in c_low or "montyor" in c_low or "mantyor" in c_low:
+                    navoi_montyor = " ".join(str(col_name).split())
+                    break
+            for _, row in df_nav.iterrows():
+                code_port = " ".join(str(row.get("Kod / Port", "") or "").replace("\xa0", " ").split())
+                repeat_code = " ".join(str(row.get("Kod / Port (Takror)", "") or "").replace("\xa0", " ").split())
+                hudud = " ".join(str(row.get("Set / Hudud", "") or "").replace("\xa0", " ").split())
+                addr = " ".join(str(row.get("Uy manzili", "") or "").replace("\xa0", " ").split())
+
+                if code_port and code_port.lower() != "nan":
+                    navoi_equipment_list.append({
+                        "set": hudud if hudud and hudud.lower() != "nan" else "(Navoi)",
+                        "number": code_port,
+                        "repeat_code": repeat_code if repeat_code and repeat_code.lower() != "nan" else "-",
+                        "address": addr if addr and addr.lower() != "nan" else "-",
+                        "montyor": navoi_montyor
+                    })
+        print(f"✅ Navoi.xlsx юкланди: {len(navoi_equipment_list)} та (Монтёр: {navoi_montyor})")
+except Exception as e:
+    print(f"❌ Navoi.xlsx файлини ўқишда хатолик: {e}")
+
 # 4. Muftalar bazasini yuklash
 existing_mufta_files = [f for f in MUFTA_FILES if os.path.exists(f)]
 if existing_mufta_files:
@@ -793,6 +827,42 @@ def format_yosh_kuch_page_text(page: int, page_size: int = 15) -> tuple[str, int
     return "\n".join(lines), page
 
 
+def build_navoi_page_keyboard(page: int, page_size: int = 15) -> InlineKeyboardMarkup:
+    total_items = len(navoi_equipment_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text="⬅️ Олдинги", callback_data=f"nav_pg_{page - 1}"))
+    nav_row.append(InlineKeyboardButton(text=f"📄 {page + 1}/{total_pages}", callback_data="nav_noop"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton(text="Кейинги ➡️", callback_data=f"nav_pg_{page + 1}"))
+
+    return InlineKeyboardMarkup(inline_keyboard=[nav_row])
+
+
+def format_navoi_page_text(page: int, page_size: int = 15) -> tuple[str, int]:
+    total_items = len(navoi_equipment_list)
+    total_pages = max(1, math.ceil(total_items / page_size))
+    page = max(0, min(page, total_pages - 1))
+
+    start_idx = page * page_size
+    end_idx = min(start_idx + page_size, total_items)
+
+    lines = [
+        f"📡 <b>OLT Навои объектлари</b> (Жами: <b>{total_items} та</b> | Саҳифа {page + 1}/{total_pages})\n"
+        f"👷 Электромонтёр: <b>{html.quote(navoi_montyor)}</b>\n"
+    ]
+    for item in navoi_equipment_list[start_idx:end_idx]:
+        rep_part = f" (<code>{html.quote(item['repeat_code'])}</code>)" if item.get("repeat_code") and item["repeat_code"] != "-" else ""
+        lines.append(
+            f"• <b>{html.quote(item['number'])}</b>{rep_part} {html.quote(item['set'])}\n"
+            f"  🏠 {html.quote(item['address'])}"
+        )
+    return "\n".join(lines), page
+
+
 def format_extra_olt_summary(olt_name: str) -> str:
     kw = olt_name.lower().strip()
     matched_ports = [
@@ -816,6 +886,11 @@ def format_extra_olt_summary(olt_name: str) -> str:
         e for e in yosh_kuch_equipment_list
         if kw in ("ёш куч", "yosh kuch", "yoshkuch")
         or kw in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
+    ]
+    matched_navoi = [
+        e for e in navoi_equipment_list
+        if kw in ("навои", "navoi", "навхос", "navxos")
+        or kw in f"{e['set']} {e['number']} {e.get('repeat_code', '')} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
     lines = [f"🏢 <b>OLT: {html.quote(olt_name)}</b>"]
@@ -862,7 +937,18 @@ def format_extra_olt_summary(olt_name: str) -> str:
                 f"  🏠 {html.quote(e['address'])}"
             )
 
-    if not matched_ports and not matched_splitters and not matched_muftalar and not matched_xonkobod and not matched_yosh_kuch:
+    if matched_navoi and kw not in ("навои", "navoi"):
+        lines.append(
+            f"\n📡 <b>OLT Навои объектларида ({len(matched_navoi)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(navoi_montyor)}</b>:\n"
+        )
+        for e in matched_navoi[:8]:
+            lines.append(
+                f"• <b>{html.quote(e['number'])}</b> {html.quote(e['set'])}\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
+    if not matched_ports and not matched_splitters and not matched_muftalar and not matched_xonkobod and not matched_yosh_kuch and not matched_navoi:
         lines.append("ℹ️ Базада ҳозирча бу OLT бўйича ёзув топилмади (тугма фаол).")
 
     return "\n".join(lines)
@@ -909,13 +995,19 @@ def search_all_databases(query: str) -> str:
         if q in f"{e['set']} {e['number']} {e.get('street', '')} {e['address']} {e.get('montyor', '')}".lower()
     ]
 
+    # 3e. Navoi.xlsx uskunalaridan qidirish
+    navoi_sp_hits = [
+        e for e in navoi_equipment_list
+        if q in f"{e['set']} {e['number']} {e.get('repeat_code', '')} {e['address']} {e.get('montyor', '')}".lower()
+    ]
+
     # 4. Muftalardan qidirish
     mufta_hits = [
         m for m in muftalar_list
         if q in f"{m['title']} {' '.join(m['addresses'])} {' '.join(m['cables'])}".lower()
     ]
 
-    if not olt_hits and not sub_hits and not sp_hits and not toma_sp_hits and not xonkobod_sp_hits and not yosh_kuch_sp_hits and not mufta_hits:
+    if not olt_hits and not sub_hits and not sp_hits and not toma_sp_hits and not xonkobod_sp_hits and not yosh_kuch_sp_hits and not navoi_sp_hits and not mufta_hits:
         return f"❌ <b>«{html.quote(query)}»</b> бўйича ҳеч нарса топилмади."
 
     out = [f"🔎 <b>Қидирув натижалари («{html.quote(query)}»):</b>"]
@@ -988,6 +1080,17 @@ def search_all_databases(query: str) -> str:
                 f"  🏠 {html.quote(e['address'])}"
             )
 
+    if navoi_sp_hits:
+        out.append(
+            f"\n📡 <b>OLT Навои объектларида ({len(navoi_sp_hits)} та)</b> "
+            f"| 👷 Монтёр: <b>{html.quote(navoi_montyor)}</b>:"
+        )
+        for e in navoi_sp_hits[:8]:
+            out.append(
+                f"• <b>{html.quote(e['number'])}</b> {html.quote(e['set'])}\n"
+                f"  🏠 {html.quote(e['address'])}"
+            )
+
     if mufta_hits:
         out.append(f"\n🧵 <b>Муфталарда ({len(mufta_hits)} та):</b>")
         for m in mufta_hits[:5]:
@@ -1041,6 +1144,7 @@ async def cmd_stats(message: Message):
         f"• TOMA ускуналар ({html.quote(toma_source_file)}): <b>{len(toma_equipment_list)} та</b> (Монтёр: <b>{html.quote(toma_montyor)}</b>)\n"
         f"• OLT Xonkobod ускуналар: <b>{len(xonkobod_equipment_list)} та</b> (Монтёр: <b>{html.quote(xonkobod_montyor)}</b>)\n"
         f"• OLT Yosh kuch объектлар: <b>{len(yosh_kuch_equipment_list)} та</b> (Монтёр: <b>{html.quote(yosh_kuch_montyor)}</b>)\n"
+        f"• OLT Навои объектлар ({html.quote(EXCEL_NAVVOI_EQUIPMENT)}): <b>{len(navoi_equipment_list)} та</b> (Монтёр: <b>{html.quote(navoi_montyor)}</b>)\n"
         f"• Муфталар: <b>{len(muftalar_list)} та</b>",
         reply_markup=keyboard
     )
@@ -1066,7 +1170,7 @@ async def prompt_search(message: Message):
         "• Абонент Ф.И.Ш. ёки логини\n"
         "• Телефон ёки IP-манзил\n"
         "• Кўча / маҳалла / уй манзили\n"
-        "• Сплиттер ёки ускуна рақами (масалан: <code>1/1 1x4</code>, <code>1/11/3</code>, <code>Miskin</code>)",
+        "• Сплиттер ёки ускуна рақами (масалан: <code>1/1 1x4</code>, <code>1/1/1</code>, <code>Navxos</code>)",
         reply_markup=keyboard
     )
 
@@ -1248,6 +1352,26 @@ async def cb_yosh_kuch_pagination(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data.startswith("nav_"))
+async def cb_navoi_pagination(callback: CallbackQuery):
+    if callback.data == "nav_noop":
+        await callback.answer()
+        return
+
+    if callback.data.startswith("nav_pg_"):
+        try:
+            page = int(callback.data.split("_")[2])
+        except ValueError:
+            page = 0
+        text, current_page = format_navoi_page_text(page)
+        mk = build_navoi_page_keyboard(current_page)
+        await callback.message.edit_text(text, reply_markup=mk)
+        await callback.answer()
+        return
+
+    await callback.answer()
+
+
 @dp.message(F.text)
 async def handle_text(message: Message):
     txt = message.text.strip()
@@ -1263,6 +1387,12 @@ async def handle_text(message: Message):
         if olt_name.lower() in ("ёш куч", "yosh kuch", "yoshkuch") and yosh_kuch_equipment_list:
             text, page = format_yosh_kuch_page_text(0)
             mk = build_yosh_kuch_page_keyboard(page)
+            await message.answer(text, reply_markup=mk)
+            return
+
+        if olt_name.lower() in ("навои", "navoi") and navoi_equipment_list:
+            text, page = format_navoi_page_text(0)
+            mk = build_navoi_page_keyboard(page)
             await message.answer(text, reply_markup=mk)
             return
 
